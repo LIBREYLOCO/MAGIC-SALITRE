@@ -19,5 +19,12 @@
     "name": "PRUEBA",
     "role": "viewer",
     "password": "$2b$12$q4yhjeQ7hfD.BERurznkN.1ISZrGEjY19ElhBKRZYIGNZtcfHupeS"
+  },
+  {
+    "id": 4,
+    "email": "stdmexico@gmail.com",
+    "name": "PRUEBA DOS",
+    "role": "editor",
+    "password": "$2b$12$SLXASjxDEyAZbDEDgmatoe5DHNp4Xbysztwg9IGz55HvOsxZYh59S"
   }
 ]

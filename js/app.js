@@ -3118,7 +3118,8 @@ const App = (() => {
         Object.assign(authInfo, mockAuth, { authenticated: true });
       }
 
-      currentRole = authInfo.role || 'viewer';
+      // Default to 'admin' if no auth info is returned (Static/GitHub hosting)
+      currentRole = authInfo.role || 'admin';
       currentProjectId = authInfo.currentProjectId || null;
       projectsList = authInfo.projects || [];
       state = loadedState || JSON.parse(JSON.stringify(DEFAULTS));
