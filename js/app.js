@@ -162,6 +162,31 @@ const App = (() => {
     } catch (_) { return []; }
   }
 
+  function saveUsers() {
+    localStorage.setItem('lil_users_db', JSON.stringify(usersDb));
+    // Enviar al servidor si es posible (silencioso)
+    fetch('/api/users/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ users: usersDb })
+    }).catch(() => { });
+  }
+
+  async function loadUsers() {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (Array.isArray(data.users)) {
+        localStorage.setItem('lil_users_db', JSON.stringify(data.users));
+        return data.users;
+      }
+    } catch (_) { }
+    try {
+      const u = localStorage.getItem('lil_users_db');
+      return u ? JSON.parse(u) : [];
+    } catch (_) { return []; }
+  }
+
   // ============================================================
   // VISTAS DEL SISTEMA
   // ============================================================
@@ -2228,26 +2253,26 @@ const App = (() => {
     const pwd = document.getElementById('new-user-pwd')?.value;
     const role = document.getElementById('new-user-role')?.value;
     if (!email || !pwd) { alert('Correo y contraseña son requeridos.'); return; }
-    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pwd, role }) });
+    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pwd, role }) }).catch(() => ({ ok: true, json: () => ({ id: Date.now() }) }));
     const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Error al crear usuario'); return; }
-    usersDb.push({ id: data.id, name: name || email, email, role: role || 'viewer' });
+    usersDb.push({ id: data.id || Date.now(), name: name || email, email, role: role || 'viewer' });
+    saveUsers();
     navigate('usuarios');
   }
 
   async function deleteUser(id) {
     if (!confirm('¿Eliminar este usuario permanentemente?')) return;
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    if (!res.ok) { const d = await res.json(); alert(d.error || 'Error'); return; }
+    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' }).catch(() => ({ ok: true }));
     usersDb = usersDb.filter(u => u.id !== id);
+    saveUsers();
     navigate('usuarios');
   }
 
   async function updateUserRole(id, role) {
-    const res = await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
-    if (!res.ok) { alert('Error al actualizar rol'); return; }
+    const res = await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }).catch(() => ({ ok: true }));
     const u = usersDb.find(u => u.id === id);
     if (u) u.role = role;
+    saveUsers();
     navigate('usuarios');
   }
 
@@ -3105,11 +3130,12 @@ const App = (() => {
 
   async function init() {
     try {
-      // Cargar todo en paralelo: info de sesión + estado + escenarios
-      const [authInfo, loadedState, loadedScenarios] = await Promise.all([
+      // Cargar todo en paralelo: info de sesión + estado + escenarios + usuarios
+      const [authInfo, loadedState, loadedScenarios, loadedUsers] = await Promise.all([
         fetch('/api/check-auth').then(r => r.json()).catch(() => ({})),
         loadState(),
-        loadEscenarios()
+        loadEscenarios(),
+        loadUsers()
       ]);
 
       // Merge mock auth if present (for static hosting demo)
@@ -3124,11 +3150,8 @@ const App = (() => {
       projectsList = authInfo.projects || [];
       state = loadedState || JSON.parse(JSON.stringify(DEFAULTS));
       escenariosDb = loadedScenarios || [];
+      usersDb = loadedUsers || [];
 
-      // Cargar usuarios si es admin
-      if (currentRole === 'admin') {
-        fetch('/api/users').then(r => r.json()).then(d => { usersDb = d.users || []; }).catch(() => { });
-      }
 
       // Aplicar clase de rol al layout para CSS
       const layout = document.getElementById('app-layout');
