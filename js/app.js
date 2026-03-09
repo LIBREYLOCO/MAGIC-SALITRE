@@ -3049,458 +3049,470 @@ const App = (() => {
     const btn = document.querySelector('[onclick="App.exportCurrentViewToPDF()"]');
     if (btn) { btn.textContent = '⏳ Generando...'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
 
-    try {
-      // Activar modo condensado para PDF
-      isPDFMode = true;
-      navigate(currentView); // Forzar re-render con modo PDF
+    // Activar modo condensado para PDF y FORZAR TEMA CLARO para impresión
+    const wasDark = document.body.classList.contains('dark-mode');
+    if (wasDark) document.body.classList.remove('dark-mode');
+    document.body.classList.add('pdf-export-active');
 
-      // Captura TODO el contenido (filas, columnas ocultas por scroll)
-      const canvas = await _captureFullElement(element, 2, '#f4f7fa');
+    isPDFMode = true;
+    navigate(currentView); // Forzar re-render con modo PDF
 
-      // Encaja en UNA SOLA hoja carta apaisada
-      const { jsPDF } = window.jspdf;
-      const PAGE_W = 297, PAGE_H = 210, MARGIN = 7;
-      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
-      _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, currentView.toUpperCase(), 1, 1);
+    // Captura TODO el contenido (filas, columnas ocultas por scroll)
+    const canvas = await _captureFullElement(element, 2, '#f4f7fa');
 
-      // Abrir en nueva pestaña → el usuario elige imprimir o guardar como PDF
-      window.open(doc.output('bloburl'), '_blank');
-    } catch (err) {
-      alert('Error al generar el PDF. Intenta de nuevo.');
-    } finally {
-      isPDFMode = false;
-      navigate(currentView); // Restaurar vista normal
-      if (btn) { btn.textContent = 'Vista actual'; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
-    }
+    // Encaja en UNA SOLA hoja carta apaisada
+    const { jsPDF } = window.jspdf;
+    const PAGE_W = 297, PAGE_H = 210, MARGIN = 7;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, currentView.toUpperCase(), 1, 1);
+
+    // Abrir en nueva pestaña → el usuario elige imprimir o guardar como PDF
+    window.open(doc.output('bloburl'), '_blank');
+  } catch (err) {
+    alert('Error al generar el PDF. Intenta de nuevo.');
+  } finally {
+    isPDFMode = false;
+    document.body.classList.remove('pdf-export-active');
+    if (wasDark) document.body.classList.add('dark-mode');
+    navigate(currentView); // Restaurar vista normal
+    if (btn) { btn.textContent = 'Vista actual'; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
   }
+}
 
   async function exportFullReport() {
-    if (typeof html2canvas === 'undefined' || !window.jspdf) {
-      alert('Librería de PDF no disponible. Verifica tu conexión a internet.');
-      return;
-    }
+  if (typeof html2canvas === 'undefined' || !window.jspdf) {
+    alert('Librería de PDF no disponible. Verifica tu conexión a internet.');
+    return;
+  }
 
-    const btn = document.getElementById('btn-full-report');
-    const { jsPDF } = window.jspdf;
-    const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
-    const fecha = new Date().toLocaleDateString('es-MX');
-    const proyecto = (state.variables && state.variables.proyecto) ? state.variables.proyecto : 'Proyecto 4L';
-    const savedView = currentView;
-    const savedTabs = {
-      activeParamTab: state.variables.activeParamTab,
-      activeProyeccionTab: state.variables.activeProyeccionTab,
-      activeReportTab: state.variables.activeReportTab
-    };
+  const btn = document.getElementById('btn-full-report');
+  const { jsPDF } = window.jspdf;
+  const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
+  const fecha = new Date().toLocaleDateString('es-MX');
+  const proyecto = (state.variables && state.variables.proyecto) ? state.variables.proyecto : 'Proyecto 4L';
+  const savedView = currentView;
+  const savedTabs = {
+    activeParamTab: state.variables.activeParamTab,
+    activeProyeccionTab: state.variables.activeProyeccionTab,
+    activeReportTab: state.variables.activeReportTab
+  };
 
-    // ── Overlay de progreso ──────────────────────────────────────
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(30,41,59,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
-    overlay.innerHTML = `
+  // ── Overlay de progreso ──────────────────────────────────────
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(30,41,59,0.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
+  overlay.innerHTML = `
       <div style="font-size:20px;font-weight:700;color:#C5A059;font-family:sans-serif;">Generando Presentación PDF</div>
       <div id="pdf-prog" style="font-size:13px;color:rgba(255,255,255,0.7);font-family:sans-serif;">Preparando portada...</div>
       <div style="width:340px;height:6px;background:rgba(255,255,255,0.15);border-radius:3px;overflow:hidden;">
         <div id="pdf-bar" style="height:100%;width:2%;background:linear-gradient(90deg,#C5A059,#e8c870);border-radius:3px;transition:width 0.4s;"></div>
       </div>
       <div id="pdf-page-label" style="font-size:11px;color:rgba(255,255,255,0.35);font-family:sans-serif;"></div>`;
-    document.body.appendChild(overlay);
-    if (btn) btn.disabled = true;
+  document.body.appendChild(overlay);
+  if (btn) btn.disabled = true;
 
-    const setProgress = (label, pct, sub) => {
-      const p = document.getElementById('pdf-prog');
-      const b = document.getElementById('pdf-bar');
-      const s = document.getElementById('pdf-page-label');
-      if (p) p.textContent = label;
-      if (b) b.style.width = Math.max(2, pct) + '%';
-      if (s) s.textContent = sub || '';
-    };
+  const setProgress = (label, pct, sub) => {
+    const p = document.getElementById('pdf-prog');
+    const b = document.getElementById('pdf-bar');
+    const s = document.getElementById('pdf-page-label');
+    if (p) p.textContent = label;
+    if (b) b.style.width = Math.max(2, pct) + '%';
+    if (s) s.textContent = sub || '';
+  };
 
-    // ── Definición de todas las páginas ─────────────────────────
-    const pages = [
-      { view: 'dashboard', title: 'Dashboard' },
-      { view: 'parametros', title: 'Parámetros — Generales', set: { activeParamTab: 'generales' } },
-      { view: 'parametros', title: 'Parámetros — Rentas y Tarifas', set: { activeParamTab: 'rentas' } },
-      { view: 'parametros', title: 'Parámetros — Estacionamiento', set: { activeParamTab: 'estacionamiento' } },
-      { view: 'parametros', title: 'Parámetros — Estructura Fiduciaria', set: { activeParamTab: 'fiduciaria' } },
-      { view: 'tickets', title: 'Estrategia de Tickets' },
-      { view: 'egresos', title: 'Presupuesto de Egresos' },
-      { view: 'construccion', title: 'Costo de Construcción y Preoperativos' },
-      { view: 'plusvalia', title: 'Análisis de Plusvalía y Mercado' },
-      { view: 'proyeccion', title: 'Corrida — Flujo Operativo Anual', set: { activeProyeccionTab: 'flujo' } },
-      { view: 'proyeccion', title: 'Corrida — Rendimiento por Fase', set: { activeProyeccionTab: 'ticket' } },
-      { view: 'proyeccion', title: 'Corrida — Recuperación Acumulada', set: { activeProyeccionTab: 'acumulado' } },
-      { view: 'reportes', title: 'Reportes — Ingresos Operativos', set: { activeReportTab: 'ingresos' } },
-      { view: 'reportes', title: 'Reportes — Construcción vs Mercado', set: { activeReportTab: 'construccion' } },
-      { view: 'reportes', title: 'Reportes — Plusvalía Especulativa', set: { activeReportTab: 'plusvalia' } },
-      { view: 'escenarios-financieros', title: 'Escenarios Financieros' },
-    ];
+  // ── Definición de todas las páginas ─────────────────────────
+  const pages = [
+    { view: 'dashboard', title: 'Dashboard' },
+    { view: 'parametros', title: 'Parámetros — Generales', set: { activeParamTab: 'generales' } },
+    { view: 'parametros', title: 'Parámetros — Rentas y Tarifas', set: { activeParamTab: 'rentas' } },
+    { view: 'parametros', title: 'Parámetros — Estacionamiento', set: { activeParamTab: 'estacionamiento' } },
+    { view: 'parametros', title: 'Parámetros — Estructura Fiduciaria', set: { activeParamTab: 'fiduciaria' } },
+    { view: 'tickets', title: 'Estrategia de Tickets' },
+    { view: 'egresos', title: 'Presupuesto de Egresos' },
+    { view: 'construccion', title: 'Costo de Construcción y Preoperativos' },
+    { view: 'plusvalia', title: 'Análisis de Plusvalía y Mercado' },
+    { view: 'proyeccion', title: 'Corrida — Flujo Operativo Anual', set: { activeProyeccionTab: 'flujo' } },
+    { view: 'proyeccion', title: 'Corrida — Rendimiento por Fase', set: { activeProyeccionTab: 'ticket' } },
+    { view: 'proyeccion', title: 'Corrida — Recuperación Acumulada', set: { activeProyeccionTab: 'acumulado' } },
+    { view: 'reportes', title: 'Reportes — Ingresos Operativos', set: { activeReportTab: 'ingresos' } },
+    { view: 'reportes', title: 'Reportes — Construcción vs Mercado', set: { activeReportTab: 'construccion' } },
+    { view: 'reportes', title: 'Reportes — Plusvalía Especulativa', set: { activeReportTab: 'plusvalia' } },
+    { view: 'escenarios-financieros', title: 'Escenarios Financieros' },
+  ];
 
-    // ── Portada Premium ──────────────────────────────────────────
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+  // ── Portada Premium ──────────────────────────────────────────
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
 
-    // Filtro para efectos de opacidad coordinados
-    const GState = doc.GState;
+  // Filtro para efectos de opacidad coordinados
+  const GState = doc.GState;
 
-    // Fondo Navy Profundo
-    doc.setFillColor(25, 35, 50);
-    doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+  // Fondo Navy Profundo
+  doc.setFillColor(25, 35, 50);
+  doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 
-    // Elementos decorativos dorados (Líneas de marco)
-    doc.setDrawColor(197, 160, 89);
-    doc.setLineWidth(0.5);
-    doc.rect(MARGIN, MARGIN, PAGE_W - MARGIN * 2, PAGE_H - MARGIN * 2, 'S');
+  // Elementos decorativos dorados (Líneas de marco)
+  doc.setDrawColor(197, 160, 89);
+  doc.setLineWidth(0.5);
+  doc.rect(MARGIN, MARGIN, PAGE_W - MARGIN * 2, PAGE_H - MARGIN * 2, 'S');
 
-    // Logo central (Si existe)
-    let logoData = null;
-    try {
-      const logoEl = document.querySelector('.brand-logo-wrap img');
-      if (logoEl && logoEl.complete) {
-        const lc = document.createElement('canvas');
-        lc.width = logoEl.naturalWidth; lc.height = logoEl.naturalHeight;
-        lc.getContext('2d').drawImage(logoEl, 0, 0);
-        logoData = lc.toDataURL('image/png');
-        const lH = 45; const lW = lH * (lc.width / lc.height);
-        doc.addImage(logoData, 'PNG', (PAGE_W - lW) / 2, 40, lW, lH);
-      }
-    } catch (e) { }
+  // Logo central (Si existe)
+  let logoData = null;
+  try {
+    const logoEl = document.querySelector('.brand-logo-wrap img');
+    if (logoEl && logoEl.complete) {
+      const lc = document.createElement('canvas');
+      lc.width = logoEl.naturalWidth; lc.height = logoEl.naturalHeight;
+      lc.getContext('2d').drawImage(logoEl, 0, 0);
+      logoData = lc.toDataURL('image/png');
+      const lH = 45; const lW = lH * (lc.width / lc.height);
+      doc.addImage(logoData, 'PNG', (PAGE_W - lW) / 2, 40, lW, lH);
+    }
+  } catch (e) { }
 
-    // Tipografía de Portada
-    doc.setTextColor(197, 160, 89);
-    doc.setFont('Montserrat', 'normal');
-    doc.setFontSize(10);
-    doc.text('ESTRATEGIA PATRIMONIAL & FINANCIERA', PAGE_W / 2, 95, { align: 'center', charSpace: 3 });
+  // Tipografía de Portada
+  doc.setTextColor(197, 160, 89);
+  doc.setFont('Montserrat', 'normal');
+  doc.setFontSize(10);
+  doc.text('ESTRATEGIA PATRIMONIAL & FINANCIERA', PAGE_W / 2, 95, { align: 'center', charSpace: 3 });
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(28);
-    doc.setFont('Montserrat', 'bold');
-    doc.text(proyecto.toUpperCase(), PAGE_W / 2, 115, { align: 'center', charSpace: 1 });
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(28);
+  doc.setFont('Montserrat', 'bold');
+  doc.text(proyecto.toUpperCase(), PAGE_W / 2, 115, { align: 'center', charSpace: 1 });
 
-    doc.setDrawColor(197, 160, 89);
-    doc.setLineWidth(1);
-    doc.line(PAGE_W / 2 - 40, 125, PAGE_W / 2 + 40, 125);
+  doc.setDrawColor(197, 160, 89);
+  doc.setLineWidth(1);
+  doc.line(PAGE_W / 2 - 40, 125, PAGE_W / 2 + 40, 125);
 
-    doc.setFontSize(14);
-    doc.setFont('Montserrat', 'normal');
-    doc.setTextColor(180, 180, 180);
-    doc.text('LIBERTAD · LOCURA · LIDERAZGO · LEGADO', PAGE_W / 2, 140, { align: 'center', charSpace: 2 });
+  doc.setFontSize(14);
+  doc.setFont('Montserrat', 'normal');
+  doc.setTextColor(180, 180, 180);
+  doc.text('LIBERTAD · LOCURA · LIDERAZGO · LEGADO', PAGE_W / 2, 140, { align: 'center', charSpace: 2 });
 
-    doc.setFontSize(10);
-    doc.setTextColor(100, 110, 130);
-    doc.text(`MEXICO, ${new Date().getFullYear()}  |  REPORTE DE INVERSIÓN`, PAGE_W / 2, 180, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setTextColor(100, 110, 130);
+  doc.text(`MEXICO, ${new Date().getFullYear()}  |  REPORTE DE INVERSIÓN`, PAGE_W / 2, 180, { align: 'center' });
 
-    // ── Índice Interactivo ───────────────────────────────────────
-    doc.addPage();
-    doc.setFillColor(250, 250, 250);
-    doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+  // ── Índice Interactivo ───────────────────────────────────────
+  doc.addPage();
+  doc.setFillColor(250, 250, 250);
+  doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 
-    doc.setFillColor(30, 41, 59);
-    doc.rect(MARGIN, MARGIN, 2, 12, 'F');
-    doc.setFontSize(18);
+  doc.setFillColor(30, 41, 59);
+  doc.rect(MARGIN, MARGIN, 2, 12, 'F');
+  doc.setFontSize(18);
+  doc.setTextColor(30, 41, 59);
+  doc.setFont('Montserrat', 'bold');
+  doc.text('CONTENIDO DEL REPORTE', MARGIN + 6, MARGIN + 9);
+
+  doc.setFontSize(10);
+  doc.setFont('Montserrat', 'normal');
+  doc.setTextColor(100, 100, 100);
+  doc.text('Haz clic en cualquier sección para navegar directamente.', MARGIN + 6, MARGIN + 16);
+
+  let currentY = MARGIN + 30;
+  const col1X = MARGIN + 10;
+  const col2X = PAGE_W / 2 + 10;
+
+  pages.forEach((p, idx) => {
+    const isCol2 = idx >= Math.ceil(pages.length / 2);
+    const x = isCol2 ? col2X : col1X;
+    const y = isCol2 ? MARGIN + 30 + (idx - Math.ceil(pages.length / 2)) * 10 : MARGIN + 30 + idx * 10;
+
+    // Dibujar punto dorado
+    doc.setFillColor(197, 160, 89);
+    doc.circle(x - 5, y - 1, 1, 'F');
+
+    // Texto con link (Se añade el link después de generar todas las páginas)
     doc.setTextColor(30, 41, 59);
-    doc.setFont('Montserrat', 'bold');
-    doc.text('CONTENIDO DEL REPORTE', MARGIN + 6, MARGIN + 9);
+    doc.setFontSize(11);
+    doc.text(p.title, x, y);
 
-    doc.setFontSize(10);
-    doc.setFont('Montserrat', 'normal');
-    doc.setTextColor(100, 100, 100);
-    doc.text('Haz clic en cualquier sección para navegar directamente.', MARGIN + 6, MARGIN + 16);
+    // Guardar posición para el link (jsPDF usa índices 1-based, portada es 1, índice es 2)
+    p.pageNumInPdf = idx + 3;
+    doc.link(x, y - 4, 80, 6, { pageNumber: p.pageNumInPdf });
+  });
 
-    let currentY = MARGIN + 30;
-    const col1X = MARGIN + 10;
-    const col2X = PAGE_W / 2 + 10;
+  // ── Captura de cada vista navegando en el DOM real ───────────
+  try {
+    // FORZAR TEMA CLARO para impresión
+    const wasDark = document.body.classList.contains('dark-mode');
+    if (wasDark) document.body.classList.remove('dark-mode');
+    document.body.classList.add('pdf-export-active'); // Add this line for full report export
 
-    pages.forEach((p, idx) => {
-      const isCol2 = idx >= Math.ceil(pages.length / 2);
-      const x = isCol2 ? col2X : col1X;
-      const y = isCol2 ? MARGIN + 30 + (idx - Math.ceil(pages.length / 2)) * 10 : MARGIN + 30 + idx * 10;
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      setProgress(
+        page.title,
+        Math.round(((i + 0.5) / pages.length) * 100),
+        `Página ${i + 1} de ${pages.length}`
+      );
 
-      // Dibujar punto dorado
-      doc.setFillColor(197, 160, 89);
-      doc.circle(x - 5, y - 1, 1, 'F');
+      // Aplicar pestaña si corresponde
+      if (page.set) Object.assign(state.variables, page.set);
 
-      // Texto con link (Se añade el link después de generar todas las páginas)
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(11);
-      doc.text(p.title, x, y);
+      // Activar modo condensado para PDF en cada página
+      isPDFMode = true;
+      // Navegar a la vista real (CSS, fuentes, charts: todo renderizado)
+      navigate(page.view);
+      // Esperar a que el DOM pinte
+      const waitMs = (page.view === 'reportes' || page.view === 'proyeccion' || page.view === 'dashboard') ? 600 : 300;
+      await new Promise(r => setTimeout(r, waitMs));
 
-      // Guardar posición para el link (jsPDF usa índices 1-based, portada es 1, índice es 2)
-      p.pageNumInPdf = idx + 3;
-      doc.link(x, y - 4, 80, 6, { pageNumber: p.pageNumInPdf });
-    });
+      const el = document.getElementById('content-body');
+      if (!el) continue;
 
-    // ── Captura de cada vista navegando en el DOM real ───────────
-    try {
-      for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        setProgress(
-          page.title,
-          Math.round(((i + 0.5) / pages.length) * 100),
-          `Página ${i + 1} de ${pages.length}`
-        );
+      // Captura el contenido completo con escala optimizada para A4
+      const canvas = await _captureFullElement(el, 2.4, '#ffffff');
 
-        // Aplicar pestaña si corresponde
-        if (page.set) Object.assign(state.variables, page.set);
+      doc.addPage();
+      const totalPags = pages.length + 2; // + portada + índice
+      _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, page.title, i + 3, totalPags);
 
-        // Activar modo condensado para PDF en cada página
-        isPDFMode = true;
-        // Navegar a la vista real (CSS, fuentes, charts: todo renderizado)
-        navigate(page.view);
-        // Esperar a que el DOM pinte
-        const waitMs = (page.view === 'reportes' || page.view === 'proyeccion' || page.view === 'dashboard') ? 600 : 300;
-        await new Promise(r => setTimeout(r, waitMs));
-
-        const el = document.getElementById('content-body');
-        if (!el) continue;
-
-        // Captura el contenido completo con escala optimizada para A4
-        const canvas = await _captureFullElement(el, 2.4, '#ffffff');
-
-        doc.addPage();
-        const totalPags = pages.length + 2; // + portada + índice
-        _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, page.title, i + 3, totalPags);
-
-        setProgress(page.title, Math.round(((i + 1) / pages.length) * 100), `Página ${i + 3} de ${totalPags} — OK`);
-      }
-
-      // ── Footer final en el índice (Opcional: actualizar índice si es necesario, 
-      // pero jspdf no permite editar páginas previas fácilmente sin plugins extra)
-
-      // Abrir en nueva pestaña → ver, imprimir o guardar como PDF
-      window.open(doc.output('bloburl'), '_blank');
-
-    } catch (err) {
-      console.error('Error al generar presentación:', err);
-      alert('Error al generar la presentación. Abre la consola para más detalles.');
-    } finally {
-      // Restaurar vista y pestañas originales
-      isPDFMode = false;
-      Object.assign(state.variables, savedTabs);
-      navigate(savedView);
-      document.body.removeChild(overlay);
-      if (btn) { btn.disabled = false; btn.textContent = '📊 Generar Presentación PDF'; }
+      setProgress(page.title, Math.round(((i + 1) / pages.length) * 100), `Página ${i + 3} de ${totalPags} — OK`);
     }
+
+    // ── Footer final en el índice (Opcional: actualizar índice si es necesario, 
+    // pero jspdf no permite editar páginas previas fácilmente sin plugins extra)
+
+    // Abrir en nueva pestaña → ver, imprimir o guardar como PDF
+    window.open(doc.output('bloburl'), '_blank');
+
+  } catch (err) {
+    console.error('Error al generar presentación:', err);
+    alert('Error al generar la presentación. Abre la consola para más detalles.');
+  } finally {
+    // Restaurar vista y pestañas originales
+    isPDFMode = false;
+    document.body.classList.remove('pdf-export-active');
+    if (wasDark) document.body.classList.add('dark-mode');
+    Object.assign(state.variables, savedTabs);
+    navigate(savedView);
+    document.body.removeChild(overlay);
+    if (btn) { btn.disabled = false; btn.textContent = '📊 Generar Presentación PDF'; }
   }
+}
 
-  async function logout() {
-    // Destruir sesión en el servidor
-    try { await fetch('/api/logout', { method: 'POST' }); } catch (_) { }
-    const portal = document.getElementById('login-portal');
-    if (portal) {
-      portal.style.display = 'flex';
-      portal.classList.remove('lp-exit');
-      document.getElementById('lp-email').value = '';
-      document.getElementById('lp-pwd').value = '';
-      // reset animation
-      portal.style.animation = 'none';
-      portal.offsetHeight;
-      portal.style.animation = '';
-    }
-    localStorage.removeItem('lyl_mock_auth');
-    // Resetear estado del botón/spinner que quedó del login anterior
-    const btn = document.getElementById('lp-btn');
-    const txt = document.getElementById('lp-btn-text');
-    const spin = document.getElementById('lp-btn-spin');
-    if (btn) btn.disabled = false;
-    if (txt) txt.style.display = '';
-    if (spin) spin.style.display = 'none';
+async function logout() {
+  // Destruir sesión en el servidor
+  try { await fetch('/api/logout', { method: 'POST' }); } catch (_) { }
+  const portal = document.getElementById('login-portal');
+  if (portal) {
+    portal.style.display = 'flex';
+    portal.classList.remove('lp-exit');
+    document.getElementById('lp-email').value = '';
+    document.getElementById('lp-pwd').value = '';
+    // reset animation
+    portal.style.animation = 'none';
+    portal.offsetHeight;
+    portal.style.animation = '';
   }
+  localStorage.removeItem('lyl_mock_auth');
+  // Resetear estado del botón/spinner que quedó del login anterior
+  const btn = document.getElementById('lp-btn');
+  const txt = document.getElementById('lp-btn-text');
+  const spin = document.getElementById('lp-btn-spin');
+  if (btn) btn.disabled = false;
+  if (txt) txt.style.display = '';
+  if (spin) spin.style.display = 'none';
+}
 
-  function saveEscenario() {
-    const nameInput = document.getElementById('nuevo-escenario-nombre');
-    if (!nameInput) return;
-    const nombre = nameInput.value.trim() || 'Escenario sin nombre';
+function saveEscenario() {
+  const nameInput = document.getElementById('nuevo-escenario-nombre');
+  if (!nameInput) return;
+  const nombre = nameInput.value.trim() || 'Escenario sin nombre';
 
-    const item = { nombre, timestamp: Date.now(), state: JSON.parse(JSON.stringify(state)) };
-    escenariosDb.push(item);
+  const item = { nombre, timestamp: Date.now(), state: JSON.parse(JSON.stringify(state)) };
+  escenariosDb.push(item);
 
-    // Persistir en servidor (fire & forget) y localStorage como fallback
-    fetch('/api/escenarios', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item)
-    }).catch(() => {
+  // Persistir en servidor (fire & forget) y localStorage como fallback
+  fetch('/api/escenarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item)
+  }).catch(() => {
+    localStorage.setItem('lil_escenarios_db', JSON.stringify(escenariosDb));
+  });
+
+  navigate('escenarios');
+}
+
+function loadEscenario(index) {
+  if (escenariosDb[index]) {
+    state = JSON.parse(JSON.stringify(escenariosDb[index].state));
+    saveState();
+    navigate('escenarios');
+  }
+}
+
+function deleteEscenario(index) {
+  if (!confirm("¿Estás seguro de que deseas borrar este ejercicio guardado?")) return;
+  if (index < 0 || index >= escenariosDb.length) return;
+
+  escenariosDb.splice(index, 1);
+
+  fetch(`/api/escenarios/${index}`, { method: 'DELETE' })
+    .catch(() => {
       localStorage.setItem('lil_escenarios_db', JSON.stringify(escenariosDb));
     });
 
-    navigate('escenarios');
-  }
+  navigate('escenarios');
+}
 
-  function loadEscenario(index) {
-    if (escenariosDb[index]) {
-      state = JSON.parse(JSON.stringify(escenariosDb[index].state));
-      saveState();
-      navigate('escenarios');
+function resetToFactory() {
+  if (!confirm("⚠️ PELIGRO: Esto borrará todos tus cambios actuales y restaurará el modelo Financiero a sus valores base. Tus 'Ejercicios' guardados NO se borrarán. ¿Continuar?")) return;
+  state = JSON.parse(JSON.stringify(DEFAULTS));
+  saveState();
+  navigate('dashboard');
+}
+
+function exportCSV() {
+  alert("Modulo de Exportación CSV en construcción para el Modelo Inmobiliario");
+}
+
+function toggleSidebar() {
+  const app = document.getElementById('app-layout');
+  if (app) {
+    const collapsed = app.classList.toggle('sidebar-collapsed');
+    localStorage.setItem('lil_sidebar_collapsed', collapsed ? '1' : '0');
+  }
+}
+
+function updateOcupacion(tipo, index, value) {
+  if (!state.variables[tipo]) {
+    state.variables[tipo] = Array(20).fill(100);
+  }
+  let num = Number(value);
+  if (isNaN(num)) num = 100;
+  if (num < 0) num = 0;
+  if (num > 100) num = 100;
+  state.variables[tipo][index] = num;
+  saveState();
+  navigate('escenarios-financieros');
+}
+function switchParamTab(tab) {
+  if (!state.variables) state.variables = {};
+  state.variables.activeParamTab = tab;
+  navigate('parametros');
+}
+
+function switchProyeccionTab(tab) {
+  if (!state.variables) state.variables = {};
+  state.variables.activeProyeccionTab = tab;
+  navigate('proyeccion');
+}
+
+async function init() {
+  try {
+    // Cargar todo en paralelo: info de sesión + estado + escenarios + usuarios
+    const [authInfo, loadedState, loadedScenarios, loadedUsers] = await Promise.all([
+      fetch('/api/check-auth').then(r => r.json()).catch(() => ({})),
+      loadState(),
+      loadEscenarios(),
+      loadUsers()
+    ]);
+
+    // Merge mock auth if present (for static hosting demo)
+    const mockAuth = JSON.parse(localStorage.getItem('lyl_mock_auth') || 'null');
+    if (mockAuth && (!authInfo.authenticated)) {
+      Object.assign(authInfo, mockAuth, { authenticated: true });
     }
-  }
 
-  function deleteEscenario(index) {
-    if (!confirm("¿Estás seguro de que deseas borrar este ejercicio guardado?")) return;
-    if (index < 0 || index >= escenariosDb.length) return;
+    // Default to 'admin' if no auth info is returned (Static/GitHub hosting)
+    currentRole = authInfo.role || 'admin';
+    currentProjectId = authInfo.currentProjectId || null;
+    projectsList = authInfo.projects || [];
+    state = loadedState || JSON.parse(JSON.stringify(DEFAULTS));
+    escenariosDb = loadedScenarios || [];
+    usersDb = loadedUsers || [];
 
-    escenariosDb.splice(index, 1);
 
-    fetch(`/api/escenarios/${index}`, { method: 'DELETE' })
-      .catch(() => {
-        localStorage.setItem('lil_escenarios_db', JSON.stringify(escenariosDb));
+    // Aplicar clase de rol al layout para CSS
+    const layout = document.getElementById('app-layout');
+    if (layout) {
+      layout.classList.toggle('role-viewer', currentRole === 'viewer');
+      layout.classList.toggle('role-admin', currentRole === 'admin');
+      layout.classList.toggle('role-editor', currentRole === 'editor');
+    }
+
+    // Renderizar selector de proyecto y visibilidad de items admin
+    renderProjectSelector();
+    updateAdminVisibility();
+
+    // ── Migraciones / guards defensivos ─────────────────────────
+    if (!state.variables) state.variables = JSON.parse(JSON.stringify(DEFAULTS.variables));
+    if (!state.tickets) state.tickets = JSON.parse(JSON.stringify(DEFAULTS.tickets));
+    if (!state.egresos) state.egresos = JSON.parse(JSON.stringify(DEFAULTS.egresos));
+    if (!state.showroomItems) state.showroomItems = JSON.parse(JSON.stringify(DEFAULTS.showroomItems));
+    if (!state.obraItems) state.obraItems = JSON.parse(JSON.stringify(DEFAULTS.obraItems));
+
+    let stateDirty = false;
+    if (Array.isArray(state.tickets)) {
+      state.tickets.forEach(t => {
+        if (t.esAportado === undefined) {
+          t.esAportado = (t.nombre === 'Capital Tierra');
+          stateDirty = true;
+        }
+        if (t.esTerrenoFijo === undefined) {
+          t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado);
+          stateDirty = true;
+        }
       });
+    }
+    if (stateDirty) saveState();
 
-    navigate('escenarios');
-  }
+    // Navegación
+    document.querySelectorAll('.nav-item[data-view]').forEach(el =>
+      el.addEventListener('click', () => {
+        // Remover 'active' handling manual para móviles si fuera necesario
+        navigate(el.dataset.view);
+      })
+    );
 
-  function resetToFactory() {
-    if (!confirm("⚠️ PELIGRO: Esto borrará todos tus cambios actuales y restaurará el modelo Financiero a sus valores base. Tus 'Ejercicios' guardados NO se borrarán. ¿Continuar?")) return;
+    // Auto-formateo Moneda
+    document.addEventListener('focus', e => {
+      const el = e.target;
+      if (!el.matches('input.form-input') || el.dataset.isText) return;
+      const v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
+      if (!isNaN(v)) el.value = v;
+    }, true);
+    document.addEventListener('blur', e => {
+      const el = e.target;
+      if (!el.matches('input.form-input') || el.dataset.isText) return;
+      const v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
+      if (!isNaN(v)) el.value = MXN.format(v);
+    }, true);
+
+    navigate('dashboard');
+  } catch (err) {
+    console.error("Critical Init Error:", err);
+    // Fallback extremo: limpiar y recargar con DEFAULTS
     state = JSON.parse(JSON.stringify(DEFAULTS));
-    saveState();
     navigate('dashboard');
   }
+}
 
-  function exportCSV() {
-    alert("Modulo de Exportación CSV en construcción para el Modelo Inmobiliario");
-  }
+return {
+  init, navigate, exportCSV, exportCurrentViewToPDF, exportFullReport, toggleSidebar,
+  addTicketTier, removeTicketTier,
+  addShowroomItem, removeShowroomItem, addObraItem, removeObraItem, toggleTicketAportado,
+  toggleAportaTerreno, selectPlusvaliaTicket,
+  saveEscenario, loadEscenario, deleteEscenario,
+  resetToFactory, resetState: resetToFactory,
+  switchReportTab, switchParamTab, switchProyeccionTab,
+  updateOcupacion, logout,
+  toggleTheme: () => {
+    const isDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('lyl_theme', isDark ? 'dark' : 'light');
+  },
+  // Roles y proyectos
+  switchProject, createProject, deleteProject,
+  // Gestión de usuarios
+  createUser, deleteUser, updateUserRole,
+  // Ledger
+  addInversionista, deleteInversionista, addPago, deletePago
+};
 
-  function toggleSidebar() {
-    const app = document.getElementById('app-layout');
-    if (app) {
-      const collapsed = app.classList.toggle('sidebar-collapsed');
-      localStorage.setItem('lil_sidebar_collapsed', collapsed ? '1' : '0');
-    }
-  }
-
-  function updateOcupacion(tipo, index, value) {
-    if (!state.variables[tipo]) {
-      state.variables[tipo] = Array(20).fill(100);
-    }
-    let num = Number(value);
-    if (isNaN(num)) num = 100;
-    if (num < 0) num = 0;
-    if (num > 100) num = 100;
-    state.variables[tipo][index] = num;
-    saveState();
-    navigate('escenarios-financieros');
-  }
-  function switchParamTab(tab) {
-    if (!state.variables) state.variables = {};
-    state.variables.activeParamTab = tab;
-    navigate('parametros');
-  }
-
-  function switchProyeccionTab(tab) {
-    if (!state.variables) state.variables = {};
-    state.variables.activeProyeccionTab = tab;
-    navigate('proyeccion');
-  }
-
-  async function init() {
-    try {
-      // Cargar todo en paralelo: info de sesión + estado + escenarios + usuarios
-      const [authInfo, loadedState, loadedScenarios, loadedUsers] = await Promise.all([
-        fetch('/api/check-auth').then(r => r.json()).catch(() => ({})),
-        loadState(),
-        loadEscenarios(),
-        loadUsers()
-      ]);
-
-      // Merge mock auth if present (for static hosting demo)
-      const mockAuth = JSON.parse(localStorage.getItem('lyl_mock_auth') || 'null');
-      if (mockAuth && (!authInfo.authenticated)) {
-        Object.assign(authInfo, mockAuth, { authenticated: true });
-      }
-
-      // Default to 'admin' if no auth info is returned (Static/GitHub hosting)
-      currentRole = authInfo.role || 'admin';
-      currentProjectId = authInfo.currentProjectId || null;
-      projectsList = authInfo.projects || [];
-      state = loadedState || JSON.parse(JSON.stringify(DEFAULTS));
-      escenariosDb = loadedScenarios || [];
-      usersDb = loadedUsers || [];
-
-
-      // Aplicar clase de rol al layout para CSS
-      const layout = document.getElementById('app-layout');
-      if (layout) {
-        layout.classList.toggle('role-viewer', currentRole === 'viewer');
-        layout.classList.toggle('role-admin', currentRole === 'admin');
-        layout.classList.toggle('role-editor', currentRole === 'editor');
-      }
-
-      // Renderizar selector de proyecto y visibilidad de items admin
-      renderProjectSelector();
-      updateAdminVisibility();
-
-      // ── Migraciones / guards defensivos ─────────────────────────
-      if (!state.variables) state.variables = JSON.parse(JSON.stringify(DEFAULTS.variables));
-      if (!state.tickets) state.tickets = JSON.parse(JSON.stringify(DEFAULTS.tickets));
-      if (!state.egresos) state.egresos = JSON.parse(JSON.stringify(DEFAULTS.egresos));
-      if (!state.showroomItems) state.showroomItems = JSON.parse(JSON.stringify(DEFAULTS.showroomItems));
-      if (!state.obraItems) state.obraItems = JSON.parse(JSON.stringify(DEFAULTS.obraItems));
-
-      let stateDirty = false;
-      if (Array.isArray(state.tickets)) {
-        state.tickets.forEach(t => {
-          if (t.esAportado === undefined) {
-            t.esAportado = (t.nombre === 'Capital Tierra');
-            stateDirty = true;
-          }
-          if (t.esTerrenoFijo === undefined) {
-            t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado);
-            stateDirty = true;
-          }
-        });
-      }
-      if (stateDirty) saveState();
-
-      // Navegación
-      document.querySelectorAll('.nav-item[data-view]').forEach(el =>
-        el.addEventListener('click', () => {
-          // Remover 'active' handling manual para móviles si fuera necesario
-          navigate(el.dataset.view);
-        })
-      );
-
-      // Auto-formateo Moneda
-      document.addEventListener('focus', e => {
-        const el = e.target;
-        if (!el.matches('input.form-input') || el.dataset.isText) return;
-        const v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
-        if (!isNaN(v)) el.value = v;
-      }, true);
-      document.addEventListener('blur', e => {
-        const el = e.target;
-        if (!el.matches('input.form-input') || el.dataset.isText) return;
-        const v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
-        if (!isNaN(v)) el.value = MXN.format(v);
-      }, true);
-
-      navigate('dashboard');
-    } catch (err) {
-      console.error("Critical Init Error:", err);
-      // Fallback extremo: limpiar y recargar con DEFAULTS
-      state = JSON.parse(JSON.stringify(DEFAULTS));
-      navigate('dashboard');
-    }
-  }
-
-  return {
-    init, navigate, exportCSV, exportCurrentViewToPDF, exportFullReport, toggleSidebar,
-    addTicketTier, removeTicketTier,
-    addShowroomItem, removeShowroomItem, addObraItem, removeObraItem, toggleTicketAportado,
-    toggleAportaTerreno, selectPlusvaliaTicket,
-    saveEscenario, loadEscenario, deleteEscenario,
-    resetToFactory, resetState: resetToFactory,
-    switchReportTab, switchParamTab, switchProyeccionTab,
-    updateOcupacion, logout,
-    toggleTheme: () => {
-      const isDark = document.body.classList.toggle('dark-mode');
-      localStorage.setItem('lyl_theme', isDark ? 'dark' : 'light');
-    },
-    // Roles y proyectos
-    switchProject, createProject, deleteProject,
-    // Gestión de usuarios
-    createUser, deleteUser, updateUserRole,
-    // Ledger
-    addInversionista, deleteInversionista, addPago, deletePago
-  };
-
-})();
+}) ();
 
 // Arrancar motor cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', App.init);

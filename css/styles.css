@@ -223,6 +223,27 @@ button {
   animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+/* ── PDF Export Overrides ── */
+body.pdf-export-active #content-body {
+  background: #ffffff !important;
+  color: #1e293b !important;
+}
+
+body.pdf-export-active .card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+  color: #1e293b !important;
+}
+
+body.pdf-export-active .kpi-label,
+body.pdf-export-active p,
+body.pdf-export-active span,
+body.pdf-export-active td,
+body.pdf-export-active th {
+  color: #1e293b !important;
+}
+
 /* ── App Layout ── */
 .app-layout {
   display: grid;
