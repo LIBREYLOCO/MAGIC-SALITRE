@@ -1080,8 +1080,32 @@ const App = (() => {
     const adminPct = (Number(v.costoAdminRentasPct) || 0) / 100;
     const maxTickets = Number(v.numTicketsMax) || 1;
 
-    const ingresoMensualBase = ingresoRentasMensualBase + ingresoEstacionamientoMensual;
-    const ingresoAnualBase = ingresoMensualBase * 12;
+    // --- PRE-CALCULAR DATA ANUAL UNIFICADA ---
+    const yearlyData = [];
+    let curRentas = ingresoRentasMensualBase * 12;
+    let curEstac = ingresoEstacionamientoMensual * 12;
+
+    for (let yr = 0; yr < anios; yr++) {
+      if (yr > 0) {
+        curRentas *= (1 + inflacion);
+        curEstac *= (1 + inflacion);
+      }
+      const pctRent = (v.ocupacionRentas && v.ocupacionRentas[yr] !== undefined) ? v.ocupacionRentas[yr] / 100 : 1;
+      const pctEstac = (v.ocupacionEstacionamiento && v.ocupacionEstacionamiento[yr] !== undefined) ? v.ocupacionEstacionamiento[yr] / 100 : 1;
+
+      const ingresoNetoRentas = curRentas * pctRent;
+      const ingresoNetoEstac = curEstac * pctEstac;
+      const ingresoBruto = ingresoNetoRentas + ingresoNetoEstac;
+      const costoAdmin = ingresoBruto * adminPct;
+      const utilidadPool = ingresoBruto - costoAdmin;
+      const utilidadPorTicket = utilidadPool / maxTickets;
+
+      yearlyData.push({
+        pctRent, pctEstac,
+        ingresoNetoRentas, ingresoNetoEstac,
+        costoAdmin, utilidadPool, utilidadPorTicket
+      });
+    }
 
     const tabStyle = (tab) => activeTab === tab
       ? 'padding:12px 24px; font-weight:600; color:var(--navy); border-bottom:2px solid var(--navy); cursor:pointer; background:rgba(30, 61, 89, 0.05); white-space:nowrap;'
@@ -1129,18 +1153,8 @@ const App = (() => {
         <tbody>`;
 
       for (let yr = 0; yr < anios; yr++) {
-        if (yr > 0) {
-          ingresoAnualRentasActual *= (1 + inflacion);
-          ingresoAnualEstacActual *= (1 + inflacion);
-        }
-        const pctRent = (v.ocupacionRentas && v.ocupacionRentas[yr] !== undefined) ? v.ocupacionRentas[yr] / 100 : 1;
-        const pctEstac = (v.ocupacionEstacionamiento && v.ocupacionEstacionamiento[yr] !== undefined) ? v.ocupacionEstacionamiento[yr] / 100 : 1;
-        const ingresoNetoRentas = ingresoAnualRentasActual * pctRent;
-        const ingresoNetoEstac = ingresoAnualEstacActual * pctEstac;
-        const ingresoBruto = ingresoNetoRentas + ingresoNetoEstac;
-        const costoAdmin = ingresoBruto * adminPct;
-        const utilidadPool = ingresoBruto - costoAdmin;
-        const utilidadPorTicket = utilidadPool / maxTickets;
+        const d = yearlyData[yr];
+        const utilidadPorTicket = d.utilidadPorTicket;
 
         let yieldCols = ``;
         state.tickets.forEach(ticket => {
@@ -1152,12 +1166,12 @@ const App = (() => {
 
         html += `<tr style="border-bottom:1px solid #f5f5f5; background:${yr % 2 === 0 ? '#fff' : '#fafbfd'};">
           <td style="padding:12px 16px; text-align:left; font-weight:600; color:var(--navy);">Año ${yr + 1}</td>
-          <td style="padding:12px 16px; font-weight:600; color:#C5A059; background:rgba(197,160,89,0.05);">${(pctRent * 100).toFixed(0)}%</td>
-          <td style="padding:12px 16px; color:var(--text-muted);">${M(ingresoNetoRentas)}</td>
-          <td style="padding:12px 16px; font-weight:600; color:#2ecc71; background:rgba(46,204,113,0.05);">${(pctEstac * 100).toFixed(0)}%</td>
-          <td style="padding:12px 16px; color:var(--text-muted);">${M(ingresoNetoEstac)}</td>
-          <td style="padding:12px 16px; color:#E8A090;">– ${M(costoAdmin)}</td>
-          <td style="padding:12px 16px; font-weight:700; color:#2ecc71;">${M(utilidadPool)}</td>
+          <td style="padding:12px 16px; font-weight:600; color:#C5A059; background:rgba(197,160,89,0.05);">${(d.pctRent * 100).toFixed(0)}%</td>
+          <td style="padding:12px 16px; color:var(--text-muted);">${M(d.ingresoNetoRentas)}</td>
+          <td style="padding:12px 16px; font-weight:600; color:#2ecc71; background:rgba(46,204,113,0.05);">${(d.pctEstac * 100).toFixed(0)}%</td>
+          <td style="padding:12px 16px; color:var(--text-muted);">${M(d.ingresoNetoEstac)}</td>
+          <td style="padding:12px 16px; color:#E8A090;">– ${M(d.costoAdmin)}</td>
+          <td style="padding:12px 16px; font-weight:700; color:#2ecc71;">${M(d.utilidadPool)}</td>
           <td style="padding:12px 16px; font-weight:700; color:var(--navy); background:rgba(197,160,89,0.05);">${M(utilidadPorTicket)}</td>
           ${yieldCols}
         </tr>`;
@@ -1165,16 +1179,9 @@ const App = (() => {
       html += `</tbody></table></div>`;
 
     } else if (activeTab === 'ticket') {
-      const utilNeta1 = ingresoAnualBase * (1 - adminPct);
-      const utilPorTicket1 = utilNeta1 / maxTickets;
-
-      let yr5Income = ingresoAnualBase;
-      for (let i = 1; i < Math.min(5, anios); i++) yr5Income *= (1 + inflacion);
-      const utilPorTicket5 = (yr5Income * (1 - adminPct)) / maxTickets;
-
-      let yrNIncome = ingresoAnualBase;
-      for (let i = 1; i < anios; i++) yrNIncome *= (1 + inflacion);
-      const utilPorTicketN = (yrNIncome * (1 - adminPct)) / maxTickets;
+      const utilPorTicket1 = yearlyData[0].utilidadPorTicket;
+      const utilPorTicket5 = anios >= 5 ? yearlyData[4].utilidadPorTicket : yearlyData[anios - 1].utilidadPorTicket;
+      const utilPorTicketN = yearlyData[anios - 1].utilidadPorTicket;
 
       html += `<p style="font-size:13px; color:var(--text-muted); margin-bottom:20px; line-height:1.6;">
         Rendimiento y cap rate proyectado por cada fase de inversión, calculado sobre la utilidad neta del pool total ÷ ${maxTickets} tickets emitidos.
@@ -1236,8 +1243,7 @@ const App = (() => {
       html += `</tr></thead><tbody>`;
 
       for (let yr = 0; yr < anios; yr++) {
-        if (yr > 0) currentIncome *= (1 + inflacion);
-        const utilPorTicket = (currentIncome * (1 - adminPct)) / maxTickets;
+        const utilPorTicket = yearlyData[yr].utilidadPorTicket;
         acum += utilPorTicket;
         let recupCols = '';
         state.tickets.forEach(t => {
