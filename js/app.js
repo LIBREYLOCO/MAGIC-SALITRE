@@ -3403,42 +3403,20 @@ function switchProyeccionTab(tab) {
 
 async function init() {
   try {
-    // Cargar todo en paralelo: info de sesión + estado + escenarios + usuarios
-    const [authInfo, loadedState, loadedScenarios, loadedUsers] = await Promise.all([
-      fetch('/api/check-auth').then(r => r.json()).catch(() => ({})),
-      loadState(),
-      loadEscenarios(),
-      loadUsers()
-    ]);
-
-    // Merge mock auth if present (for static hosting demo)
+    // ── FASE 1: Renderizado inmediato con datos locales ───────────────
+    // Sin await: carga desde localStorage para mostrar UI de inmediato
     const mockAuth = JSON.parse(localStorage.getItem('lyl_mock_auth') || 'null');
-    if (mockAuth && (!authInfo.authenticated)) {
-      Object.assign(authInfo, mockAuth, { authenticated: true });
-    }
+    currentRole = mockAuth?.role || 'admin';
 
-    // Default to 'admin' if no auth info is returned (Static/GitHub hosting)
-    currentRole = authInfo.role || 'admin';
-    currentProjectId = authInfo.currentProjectId || null;
-    projectsList = authInfo.projects || [];
-    state = loadedState || JSON.parse(JSON.stringify(DEFAULTS));
-    escenariosDb = loadedScenarios || [];
-    usersDb = loadedUsers || [];
+    try {
+      const s = localStorage.getItem('lyl_bienraiz_state');
+      state = (s ? JSON.parse(s) : null) || JSON.parse(JSON.stringify(DEFAULTS));
+    } catch (_) { state = JSON.parse(JSON.stringify(DEFAULTS)); }
 
+    try { escenariosDb = JSON.parse(localStorage.getItem('lil_escenarios_db') || '[]'); } catch (_) { escenariosDb = []; }
+    try { const u = localStorage.getItem('lil_users_db'); usersDb = u ? JSON.parse(u) : []; } catch (_) { usersDb = []; }
 
-    // Aplicar clase de rol al layout para CSS
-    const layout = document.getElementById('app-layout');
-    if (layout) {
-      layout.classList.toggle('role-viewer', currentRole === 'viewer');
-      layout.classList.toggle('role-admin', currentRole === 'admin');
-      layout.classList.toggle('role-editor', currentRole === 'editor');
-    }
-
-    // Renderizar selector de proyecto y visibilidad de items admin
-    renderProjectSelector();
-    updateAdminVisibility();
-
-    // ── Migraciones / guards defensivos ─────────────────────────
+    // ── Migraciones / guards defensivos ─────────────────────────────
     if (!state.variables) state.variables = JSON.parse(JSON.stringify(DEFAULTS.variables));
     if (!state.tickets) state.tickets = JSON.parse(JSON.stringify(DEFAULTS.tickets));
     if (!state.egresos) state.egresos = JSON.parse(JSON.stringify(DEFAULTS.egresos));
@@ -3448,24 +3426,26 @@ async function init() {
     let stateDirty = false;
     if (Array.isArray(state.tickets)) {
       state.tickets.forEach(t => {
-        if (t.esAportado === undefined) {
-          t.esAportado = (t.nombre === 'Capital Tierra');
-          stateDirty = true;
-        }
-        if (t.esTerrenoFijo === undefined) {
-          t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado);
-          stateDirty = true;
-        }
+        if (t.esAportado === undefined) { t.esAportado = (t.nombre === 'Capital Tierra'); stateDirty = true; }
+        if (t.esTerrenoFijo === undefined) { t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado); stateDirty = true; }
       });
     }
     if (stateDirty) saveState();
 
+    // Aplicar clase de rol al layout para CSS
+    const layout = document.getElementById('app-layout');
+    if (layout) {
+      layout.classList.toggle('role-viewer', currentRole === 'viewer');
+      layout.classList.toggle('role-admin', currentRole === 'admin');
+      layout.classList.toggle('role-editor', currentRole === 'editor');
+    }
+
+    renderProjectSelector();
+    updateAdminVisibility();
+
     // Navegación
     document.querySelectorAll('.nav-item[data-view]').forEach(el =>
-      el.addEventListener('click', () => {
-        // Remover 'active' handling manual para móviles si fuera necesario
-        navigate(el.dataset.view);
-      })
+      el.addEventListener('click', () => navigate(el.dataset.view))
     );
 
     // Auto-formateo Moneda
@@ -3482,10 +3462,54 @@ async function init() {
       if (!isNaN(v)) el.value = MXN.format(v);
     }, true);
 
+    // ── Renderizar INMEDIATAMENTE con datos locales ──────────────────
     navigate('dashboard');
+
+    // ── FASE 2: Actualizar desde servidor en background ──────────────
+    // (sin bloquear la UI — el dashboard ya está visible)
+    try {
+      const [authInfo, loadedState, loadedScenarios, loadedUsers] = await Promise.all([
+        fetch('/api/check-auth', { signal: AbortSignal.timeout(5000) }).then(r => r.json()).catch(() => ({})),
+        loadState(),
+        loadEscenarios(),
+        loadUsers()
+      ]);
+
+      if (mockAuth && !authInfo.authenticated) {
+        Object.assign(authInfo, mockAuth, { authenticated: true });
+      }
+
+      const serverRole = authInfo.role || currentRole;
+      currentProjectId = authInfo.currentProjectId || null;
+      projectsList = authInfo.projects || [];
+
+      // Actualizar usuarios desde servidor
+      if (Array.isArray(loadedUsers) && loadedUsers.length > 0) usersDb = loadedUsers;
+      if (Array.isArray(loadedScenarios)) escenariosDb = loadedScenarios;
+
+      // Si el rol o el estado cambió, re-renderizar
+      const stateChanged = loadedState && JSON.stringify(loadedState) !== JSON.stringify(state);
+      const roleChanged = serverRole !== currentRole;
+
+      if (stateChanged) state = loadedState;
+      if (roleChanged) {
+        currentRole = serverRole;
+        const l2 = document.getElementById('app-layout');
+        if (l2) {
+          l2.classList.toggle('role-viewer', currentRole === 'viewer');
+          l2.classList.toggle('role-admin', currentRole === 'admin');
+          l2.classList.toggle('role-editor', currentRole === 'editor');
+        }
+        updateAdminVisibility();
+      }
+      if (stateChanged || roleChanged) {
+        renderProjectSelector();
+        navigate(currentView);
+      }
+    } catch (_) { /* background sync failed — datos locales siguen activos */ }
+
   } catch (err) {
     console.error("Critical Init Error:", err);
-    // Fallback extremo: limpiar y recargar con DEFAULTS
     state = JSON.parse(JSON.stringify(DEFAULTS));
     navigate('dashboard');
   }
