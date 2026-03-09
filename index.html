@@ -1311,6 +1311,20 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <!-- Main App Module -->
   <script src="js/app.js"></script>
+  <script>
+    // Guardián: si el spinner sigue visible 3s después, reintenta init o muestra error
+    setTimeout(function () {
+      var body = document.getElementById('content-body');
+      if (!body || !body.querySelector('.loading-spinner')) return; // ya renderizó, todo bien
+      if (window.App && window.App.navigate) {
+        try { window.App.navigate('dashboard'); } catch (e) {
+          body.innerHTML = '<div style="padding:24px;color:#c00;font-family:sans-serif"><b>Error al cargar el dashboard:</b><br>' + e.message + '</div>';
+        }
+      } else {
+        body.innerHTML = '<div style="padding:24px;color:#c00;font-family:sans-serif"><b>App no se inicializó.</b><br>Recarga la página (Ctrl+Shift+R).</div>';
+      }
+    }, 3000);
+  </script>
 </body>
 
 </html>
