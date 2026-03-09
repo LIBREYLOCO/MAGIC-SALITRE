@@ -3006,11 +3006,11 @@ const App = (() => {
     const printW = PAGE_W - MARGIN * 2;
     const printH = PAGE_H - MARGIN * 3; // Menos espacio para header/footer
     const ar = canvas.width / canvas.height;
-    // Llenar siempre el ancho completo; si el contenido es muy alto (retrato) se recorta el fondo
-    const imgW = printW;
-    const imgH = Math.min(imgW / ar, printH);
-    const x = MARGIN;
-    const y = MARGIN + 6; // Desplazado abajo por el header
+    // Contain: escalar para que TODO el contenido quepa, centrando en la página
+    let imgW = printW, imgH = imgW / ar;
+    if (imgH > printH) { imgH = printH; imgW = imgH * ar; }
+    const x = MARGIN + (printW - imgW) / 2;
+    const y = MARGIN + 6 + (printH - imgH) / 2;
 
     // 1. Watermark (Fondo sutil)
     doc.saveGraphicsState();
@@ -3067,9 +3067,8 @@ const App = (() => {
     navigate(currentView);
     await new Promise(r => setTimeout(r, 600)); // Esperar re-render y charts
 
-    const A4_RATIO = 297 / 210;
     const capW = element.scrollWidth;
-    const capH = Math.min(element.scrollHeight, Math.round(capW / A4_RATIO));
+    const capH = element.scrollHeight;
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
@@ -3086,8 +3085,12 @@ const App = (() => {
     });
 
     const { jsPDF } = window.jspdf;
-    const PAGE_W = 297, PAGE_H = 210, MARGIN = 7;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    const MARGIN = 7;
+    const ar = canvas.width / canvas.height;
+    const orientation = ar >= 0.8 ? 'landscape' : 'portrait';
+    const PAGE_W = orientation === 'landscape' ? 297 : 210;
+    const PAGE_H = orientation === 'landscape' ? 210 : 297;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation });
     _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, currentView.toUpperCase(), 1, 1);
     const proyecto = (state.variables && state.variables.proyecto) ? state.variables.proyecto.replace(/\s+/g, '_') : 'vista';
     doc.save(`${currentView}-${proyecto}.pdf`);
@@ -3285,10 +3288,9 @@ const App = (() => {
       const el = document.getElementById('content-body');
       if (!el) continue;
 
-      // Captura con proporción exacta A4 landscape (escala 1.5 para evitar crashes de memoria)
-      const A4_RATIO = 297 / 210;
+      // Captura completa del contenido (sin recorte)
       const capW = el.scrollWidth;
-      const capH = Math.min(el.scrollHeight, Math.round(capW / A4_RATIO));
+      const capH = el.scrollHeight;
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
@@ -3304,9 +3306,15 @@ const App = (() => {
         windowHeight: capH
       });
 
-      doc.addPage();
+      // Auto-orientación: landscape si el contenido es más ancho que alto
+      const pageAr = canvas.width / canvas.height;
+      const pageOrientation = pageAr >= 0.8 ? 'landscape' : 'portrait';
+      const pW = pageOrientation === 'landscape' ? 297 : 210;
+      const pH = pageOrientation === 'landscape' ? 210 : 297;
+
+      doc.addPage({ orientation: pageOrientation, format: 'a4' });
       const totalPags = pages.length + 2; // + portada + índice
-      _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, page.title, i + 3, totalPags);
+      _addCanvasToPage(doc, canvas, pW, pH, MARGIN, page.title, i + 3, totalPags);
 
       setProgress(page.title, Math.round(((i + 1) / pages.length) * 100), `Página ${i + 3} de ${totalPags} — OK`);
     }
