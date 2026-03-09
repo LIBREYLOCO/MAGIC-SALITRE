@@ -3067,8 +3067,19 @@ const App = (() => {
     isPDFMode = true;
     navigate(currentView); // Forzar re-render con modo PDF
 
-    // Captura TODO el contenido (filas, columnas ocultas por scroll)
-    const canvas = await _captureFullElement(element, 2, '#f4f7fa');
+    // Captura el área visible (proporción landscape para A4)
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#f4f7fa',
+      logging: false,
+      foreignObjectRendering: false,
+      scrollX: 0,
+      scrollY: 0,
+      height: element.clientHeight,
+      windowHeight: element.clientHeight
+    });
 
     // Encaja en UNA SOLA hoja carta apaisada
     const { jsPDF } = window.jspdf;
@@ -3271,8 +3282,19 @@ const App = (() => {
       const el = document.getElementById('content-body');
       if (!el) continue;
 
-      // Captura el contenido completo con escala optimizada para A4
-      const canvas = await _captureFullElement(el, 2.4, '#ffffff');
+      // Captura el área visible de la vista
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        foreignObjectRendering: false,
+        scrollX: 0,
+        scrollY: 0,
+        height: el.clientHeight,
+        windowHeight: el.clientHeight
+      });
 
       doc.addPage();
       const totalPags = pages.length + 2; // + portada + índice
