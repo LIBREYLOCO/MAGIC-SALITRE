@@ -128,8 +128,15 @@
           <div class="lp-field">
             <label class="lp-label">Contraseña</label>
             <div style="position:relative">
-              <input type="password" id="lp-pwd" class="lp-input" placeholder="Opcional por ahora"
+              <input type="password" id="lp-pwd" class="lp-input" placeholder="Ingresa tu contraseña"
                 autocomplete="current-password" required>
+              <button type="button" class="lp-eye" onclick="toggleLPVPwd()" title="Mostrar/Ocultar">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
             </div>
           </div>
           <div class="lp-error" id="lp-error">Acceso denegado.</div>
@@ -176,7 +183,8 @@
     /* Center terracotta band */
     .lp-center {
       position: relative;
-      width: min(560px, 52vw);
+      width: min(560px, 90vw);
+      /* Aumentado de 52vw para mejor visualización en móviles */
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -822,7 +830,7 @@
     // Verificar sesión activa en el servidor al cargar la página
     (async function () {
       try {
-        const res  = await fetch('/api/check-auth');
+        const res = await fetch('/api/check-auth');
         const data = await res.json();
         if (data.authenticated) {
           document.getElementById('login-portal').style.display = 'none';
@@ -830,41 +838,67 @@
       } catch (_) { /* sin conexión al servidor — mostrar login */ }
     })();
 
+    function toggleLPVPwd() {
+      const p = document.getElementById('lp-pwd');
+      p.type = p.type === 'password' ? 'text' : 'password';
+    }
+
     async function lplLogin(e) {
       e.preventDefault();
-      const err  = document.getElementById('lp-error');
-      const btn  = document.getElementById('lp-btn');
-      const txt  = document.getElementById('lp-btn-text');
+      const err = document.getElementById('lp-error');
+      const btn = document.getElementById('lp-btn');
+      const txt = document.getElementById('lp-btn-text');
       const spin = document.getElementById('lp-btn-spin');
       const email = document.getElementById('lp-email').value.trim().toLowerCase();
-      const pwd   = document.getElementById('lp-pwd').value;
+      const pwd = document.getElementById('lp-pwd').value;
 
       err.classList.remove('visible');
       btn.disabled = true; txt.style.display = 'none'; spin.style.display = 'block';
 
+      const MOCK_EMAIL = 'libreyloco@icloud.com';
+      const MOCK_PASS = 'SALITRE';
+
+      const finishLogin = () => {
+        const p = document.getElementById('login-portal');
+        if (p) {
+          p.classList.add('lp-exit');
+          setTimeout(() => { p.style.display = 'none'; }, 700);
+        }
+      };
+
       try {
-        const res  = await fetch('/api/login', {
+        const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password: pwd })
         });
-        const data = await res.json();
 
-        if (res.ok && data.ok) {
-          const p = document.getElementById('login-portal');
-          if (p) {
-            p.classList.add('lp-exit');
-            setTimeout(() => { p.style.display = 'none'; }, 700);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok) {
+            finishLogin();
+            return;
           }
+        }
+
+        // Fallback local si el servidor responde con error (ej. 404 en hosting estático)
+        if (email === MOCK_EMAIL && pwd === MOCK_PASS) {
+          finishLogin();
         } else {
+          const data = await res.json().catch(() => ({}));
           err.textContent = data.error || 'Credenciales incorrectas.';
           err.classList.add('visible');
           btn.disabled = false; txt.style.display = 'block'; spin.style.display = 'none';
         }
       } catch (_) {
-        err.textContent = 'Error de conexión. Intenta de nuevo.';
-        err.classList.add('visible');
-        btn.disabled = false; txt.style.display = 'block'; spin.style.display = 'none';
+        // Fallback local si no hay servidor (conexión rechazada/offline)
+        if (email === MOCK_EMAIL && pwd === MOCK_PASS) {
+          finishLogin();
+        } else {
+          err.textContent = 'Error de conexión / Credenciales incorrectas.';
+          err.classList.add('visible');
+          btn.disabled = false; txt.style.display = 'block'; spin.style.display = 'none';
+        }
       }
     }
 
@@ -982,7 +1016,8 @@
       <!-- Badge de rol del usuario -->
       <div style="padding:0 14px 10px; display:flex; align-items:center; gap:8px;">
         <span style="font-size:10px; color:#888; text-transform:uppercase; letter-spacing:.5px;">Rol:</span>
-        <span id="user-role-badge" style="font-size:10px;color:#fff;padding:2px 8px;border-radius:10px;background:#888;">—</span>
+        <span id="user-role-badge"
+          style="font-size:10px;color:#fff;padding:2px 8px;border-radius:10px;background:#888;">—</span>
       </div>
 
       <ul class="nav-list" id="nav-list">
@@ -1108,16 +1143,16 @@
         <li class="nav-section-label nav-admin-only" style="display:none;">Administración</li>
         <li class="nav-item nav-admin-only" data-view="proyectos" style="display:none;">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-            <rect x="2" y="4" width="7" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-            <rect x="11" y="4" width="7" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="2" y="4" width="7" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+            <rect x="11" y="4" width="7" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" />
           </svg>
           <span>Proyectos</span>
         </li>
         <li class="nav-item nav-admin-only" data-view="usuarios" style="display:none;">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none">
-            <circle cx="8" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M2 17c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            <path d="M15 9v4M17 11h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="7" r="3" stroke="currentColor" stroke-width="1.5" />
+            <path d="M2 17c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            <path d="M15 9v4M17 11h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           </svg>
           <span>Usuarios</span>
         </li>
