@@ -1864,7 +1864,10 @@ const App = (() => {
     const rentaM2HotelNivel2 = Number(v.rentaM2HotelNivel2) || 0;
 
     const ingresoRentasMensualBase = (m2ComercialPB * rentaM2Comercial) + (m2HotelNivel1 * rentaM2HotelNivel1) + (m2HotelNivel2 * rentaM2HotelNivel2);
-    const ingresoEstacionamientoMensualBase = Number(v.rentaMensualEstacionamiento) || 0;
+
+    const cochesDiarios = Number(v.cochesDiarios) || 350;
+    const precioCoche = Number(v.precioPorCoche) || 50;
+    const ingresoEstacionamientoMensualBase = cochesDiarios * precioCoche * 30;
 
     let html = `<div class="section-header">
       <div>
