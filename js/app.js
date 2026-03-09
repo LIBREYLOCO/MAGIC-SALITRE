@@ -207,10 +207,10 @@ const App = (() => {
     const capRate = entradas > 0 ? (ingresoAnualTotal / entradas) * 100 : 0;
     const pctCapitalNeto = meta > 0 ? (capitalNeto / meta) * 100 : 0;
 
-    const kpiCard = (label, valor, sub, color, borderColor) =>
-      `<div class="card" style="padding:20px; border-top:3px solid ${borderColor};">
-        <div style="font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); margin-bottom:8px;">${label}</div>
-        <div style="font-size:22px; font-weight:700; color:${color}; line-height:1.2;">${valor}</div>
+    const kpiCard = (label, valor, sub, color, borderColor, tooltip) =>
+      `<div class="card ${color.includes('status') ? color : ''}" style="padding:20px; border-top:3px solid ${borderColor}; transition: transform 0.3s ease;" ${tooltip ? `data-tooltip="${tooltip}"` : ''}>
+        <div class="kpi-label">${label} ${tooltip ? '<span class="info-icon">i</span>' : ''}</div>
+        <div style="font-size:22px; font-weight:700; color:${color.startsWith('status') ? 'inherit' : color}; line-height:1.2;">${valor}</div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">${sub}</div>
       </div>`;
 
@@ -226,12 +226,19 @@ const App = (() => {
       </div>
     </div>
 
-    <!-- KPIs principales -->
+    // KPIs principales
     <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:20px;">
-      ${kpiCard('Meta de Capital', M(meta), 'Objetivo de levantamiento', 'var(--navy)', '#C5A059')}
-      ${kpiCard('Entradas Proyectadas', M(entradas), `<span style="font-weight:700; color:${pclMeta >= 100 ? '#2ecc71' : '#C5A059'};">${pclMeta.toFixed(1)}%</span> de la meta cubierto`, '#2ecc71', '#2ecc71')}
-      ${kpiCard('Egresos de Levantamiento', M(egresosTotales), `Fijos ${meses} meses + comisiones + acop.`, '#E8A090', '#E8A090')}
-      ${kpiCard('Capital Neto a Obra', M(capitalNeto), `${pctCapitalNeto.toFixed(1)}% del objetivo disponible para construcción`, capitalNeto >= meta * 0.8 ? 'var(--navy)' : '#C5A059', 'var(--navy)')}
+      ${kpiCard('Meta de Capital', M(meta), 'Objetivo de levantamiento', 'var(--navy)', '#C5A059', 'Monto total de inversión necesaria para el proyecto.')}
+      ${kpiCard('Entradas Proyectadas', M(entradas), `<span style="font-weight:700; color:${pclMeta >= 100 ? '#2ecc71' : '#C5A059'};">${pclMeta.toFixed(1)}%</span> de la meta cubierto`, '#2ecc71', '#2ecc71', 'Capital total comprometido por los inversionistas a la fecha.')}
+      ${kpiCard('Egresos de Levantamiento', M(egresosTotales), `Fijos ${meses} meses + comisiones + acop.`, '#E8A090', '#E8A090', 'Gastos operativos, comerciales y de preventa.')}
+      ${kpiCard('Capital Neto a Obra', M(capitalNeto), `${pctCapitalNeto.toFixed(1)}% del objetivo disponible`, capitalNeto >= meta * 0.8 ? 'var(--navy)' : '#C5A059', 'var(--navy)', 'Capital remanente para construcción después de egresos.')}
+    </div>
+
+    <!-- KPIs de Rendimiento -->
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:20px;">
+      ${kpiCard('Cap Rate Bruto Anual', `${capRate.toFixed(2)}%`, 'Ingreso anual ÷ capital captado', capRate > 8 ? 'status-high' : capRate > 5 ? 'status-mid' : 'status-low', '#C5A059', 'Tasa de capitalización: Eficiencia del activo para generar rentas. Ideal > 8%')}
+      ${kpiCard('Equivalencia Física', `${(22.5).toFixed(1)} m²`, '9,000 m² rentables totales', 'var(--navy)', '#C5A059', 'Metros cuadrados proporcionales por ticket de inversión.')}
+      ${kpiCard('Ingreso Mensual Pool', M(v.ingresoMensualNeto || 0), 'Rentas + estacionamiento', v.ingresoMensualNeto > 4000000 ? 'status-high' : 'var(--navy)', '#C5A059', 'Flujo de caja neto estimado repartible mensualmente.')}
     </div>
 
     <!-- Barra de progreso -->
