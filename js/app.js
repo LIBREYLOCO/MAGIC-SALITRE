@@ -3538,5 +3538,12 @@ return {
 
 }) ();
 
-// Arrancar motor cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', App.init);
+// Exponer App globalmente (necesario para onclick="App.navigate()" en el HTML)
+window.App = App;
+
+// Inicializar — el script está al final de <body>, DOM completamente disponible
+App.init().catch(function (e) {
+  console.error('App.init falló:', e);
+  // Fallback: forzar render del dashboard con DEFAULTS
+  try { App.navigate('dashboard'); } catch (_) {}
+});
