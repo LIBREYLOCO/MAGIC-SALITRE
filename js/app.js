@@ -1226,7 +1226,6 @@ const App = (() => {
 
     } else if (activeTab === 'acumulado') {
       let acum = 0;
-      let currentIncome = ingresoAnualBase;
 
       html += `<p style="font-size:13px; color:var(--text-muted); margin-bottom:20px; line-height:1.6;">
         Muestra cuánto ha recuperado cada fase de su inversión inicial, año a año. Verde = recuperación total del capital.
