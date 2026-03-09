@@ -2746,12 +2746,20 @@ const App = (() => {
     const body = document.getElementById('content-body');
     if (body) {
       destroyCharts();
-      body.innerHTML = RENDERERS[view]();
+      try {
+        body.innerHTML = RENDERERS[view]();
+      } catch (renderErr) {
+        console.error('Render error for view "' + view + '":', renderErr);
+        body.innerHTML = '<div style="padding:32px; color:#c00;">Error al renderizar vista. Recarga la página.<br><small>' + renderErr.message + '</small></div>';
+        return;
+      }
       attachInputListeners();
 
       if (view === 'reportes') {
         setTimeout(initReportesCharts, 50);
       }
+    } else {
+      console.error('content-body element not found in DOM');
     }
   }
 
