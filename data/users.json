@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "email": "stdmexico@me.com",
+    "name": "Admin",
+    "role": "admin",
+    "password": "$2b$12$/FisdiRuy0L1W7XXtPpKBeQwuBHW5Z0XAoXuP6VyTezZQbxaA81Ka"
+  },
+  {
+    "id": 2,
+    "email": "libreyloco@icloud.com",
+    "name": "Editor",
+    "role": "admin",
+    "password": "$2b$12$cQUInmbxDCmi70yIWl2RYurEnowV84sBasuB8rUEMmZTZGiv4MW2K"
+  },
+  {
+    "id": 3,
+    "email": "stdmexico@mac.com",
+    "name": "PRUEBA",
+    "role": "viewer",
+    "password": "$2b$12$q4yhjeQ7hfD.BERurznkN.1ISZrGEjY19ElhBKRZYIGNZtcfHupeS"
+  }
+]

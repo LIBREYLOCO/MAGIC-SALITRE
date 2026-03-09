@@ -3,4 +3,5 @@ node_modules/
 .gemini/
 *.log
 .env
-data/users.json
+data/state-*.json
+data/escenarios-*.json

@@ -855,8 +855,6 @@
       err.classList.remove('visible');
       btn.disabled = true; txt.style.display = 'none'; spin.style.display = 'block';
 
-      const MOCK_ADMIN_EMAIL = 'stdmexico@me.com';
-      const MOCK_VIEWER_EMAIL = 'libreyloco@icloud.com';
       const MOCK_PASS = 'SALITRE';
 
       const finishLogin = () => {
@@ -884,16 +882,16 @@
 
         // Fallback local si el servidor responde con error (ej. 404 en hosting estático)
         if (pwd === MOCK_PASS) {
-          if (email === MOCK_ADMIN_EMAIL) {
-            localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: 'Admin', role: 'admin' }));
-            finishLogin();
-            return;
-          }
-          if (email === MOCK_VIEWER_EMAIL) {
-            localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: 'Lyl', role: 'viewer' }));
-            finishLogin();
-            return;
-          }
+          try {
+            const uRes = await fetch('data/users.json');
+            const users = await uRes.json();
+            const user = users.find(u => u.email === email);
+            if (user) {
+              localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: user.name, role: user.role }));
+              finishLogin();
+              return;
+            }
+          } catch (e) { }
         }
 
         const data = await res.json().catch(() => ({}));
@@ -903,16 +901,16 @@
       } catch (_) {
         // Fallback local si no hay servidor (conexión rechazada/offline)
         if (pwd === MOCK_PASS) {
-          if (email === MOCK_ADMIN_EMAIL) {
-            localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: 'Admin', role: 'admin' }));
-            finishLogin();
-            return;
-          }
-          if (email === MOCK_VIEWER_EMAIL) {
-            localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: 'Lyl', role: 'viewer' }));
-            finishLogin();
-            return;
-          }
+          try {
+            const uRes = await fetch('data/users.json');
+            const users = await uRes.json();
+            const user = users.find(u => u.email === email);
+            if (user) {
+              localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: user.name, role: user.role }));
+              finishLogin();
+              return;
+            }
+          } catch (e) { }
         }
 
         err.textContent = 'Error de conexión / Credenciales incorrectas.';
