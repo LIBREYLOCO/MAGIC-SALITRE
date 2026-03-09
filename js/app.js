@@ -188,7 +188,8 @@ const App = (() => {
     // --- NUEVOS INDICADORES DE TICKETS (INVENTARIO REAL) ---
     const invs = state.inversionistas || [];
     const tVendidosLedger = invs.reduce((s, i) => s + (Number(i.tickets) || 0), 0);
-    const tAportados = state.tickets.filter(t => t.esAportado).reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const tAportadosBase = state.tickets.filter(t => t.esAportado).reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const tAportados = tAportadosBase + ticketsModelo;
     const tDisponibles = maxTickets - tVendidosLedger - tAportados;
 
     // M²
