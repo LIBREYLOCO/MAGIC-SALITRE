@@ -1,0 +1,265 @@
+{
+  "variables": {
+    "proyecto": "Pueblo Mexicano Querétaro (Tipo Val'Quirico)",
+    "capitalRequerido": 215000000,
+    "terreno": 40000,
+    "numTicketsMax": 400,
+    "m2ComercialPB": 3000,
+    "rentaM2Comercial": 450,
+    "m2HotelNivel1": 3000,
+    "rentaM2HotelNivel1": 350,
+    "m2HotelNivel2": 3000,
+    "rentaM2HotelNivel2": 300,
+    "m2Estacionamiento": 6000,
+    "capacidadEstacionamiento": 270,
+    "cochesDiarios": 350,
+    "precioPorCoche": 70,
+    "valorFideicomiso": 2000000,
+    "costoFideicomisoMensual": 50000,
+    "aniosProyeccion": 10,
+    "inflacionAnualRentas": 5,
+    "costoAdminRentasPct": 8.9,
+    "pctTicketsModelo": 10,
+    "costoM2Construccion": 21000,
+    "precioMercadoActualM2": 48500,
+    "aportaTerreno": false,
+    "valorTerrenoAportado": 36000000,
+    "precioTicketTerreno": 599999,
+    "selectedPlusvaliaTicketIdx": 0,
+    "activeReportTab": "ingresos",
+    "ocupacionRentas": [
+      60,
+      75,
+      90,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ],
+    "ocupacionEstacionamiento": [
+      60,
+      75,
+      90,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ]
+  },
+  "tickets": [
+    {
+      "id": 1,
+      "cantidad": 50,
+      "precio": 499999,
+      "nombre": "Fase Semilla",
+      "esAportado": false,
+      "esTerrenoFijo": false
+    },
+    {
+      "id": 2,
+      "cantidad": 50,
+      "precio": 549999,
+      "nombre": "Preventa Privada",
+      "esAportado": false,
+      "esTerrenoFijo": false
+    },
+    {
+      "id": 3,
+      "cantidad": 75,
+      "precio": 599999,
+      "nombre": "Oferta Primaria",
+      "esAportado": false,
+      "esTerrenoFijo": false
+    },
+    {
+      "id": 4,
+      "cantidad": 75,
+      "precio": 649999,
+      "nombre": "Oferta Secundaria",
+      "esAportado": false,
+      "esTerrenoFijo": false
+    },
+    {
+      "id": 5,
+      "cantidad": 50,
+      "precio": 719999,
+      "nombre": "Cierre de Emisión",
+      "esAportado": false,
+      "esTerrenoFijo": false
+    },
+    {
+      "id": 6,
+      "cantidad": 60,
+      "precio": 599999,
+      "nombre": "Capital Tierra",
+      "esAportado": true,
+      "esTerrenoFijo": true
+    }
+  ],
+  "egresos": {
+    "nominaAdmin": 80000,
+    "nominaVentas": 150000,
+    "gastosContables": 30000,
+    "gastosLegales": 60000,
+    "rentaLugar": 20000,
+    "gastosPublicidad": 150000,
+    "gastosRepresentacion": 50000,
+    "acopOficina": 150000,
+    "acopMaqueta": 120000,
+    "acopRenders": 80000,
+    "acopFotos": 30000,
+    "acopMedia": 120000,
+    "comisionVentasPct": 8,
+    "mesesLevantamiento": 24
+  },
+  "showroomItems": [
+    {
+      "nombre": "Maqueta del Proyecto",
+      "cantidad": 1,
+      "costo": 150000
+    },
+    {
+      "nombre": "Escritorios",
+      "cantidad": 4,
+      "costo": 8000
+    },
+    {
+      "nombre": "Sillas de Oficina",
+      "cantidad": 8,
+      "costo": 3500
+    },
+    {
+      "nombre": "Cuadros / Arte Decorativo",
+      "cantidad": 6,
+      "costo": 7000
+    },
+    {
+      "nombre": "Televisión / Monitor",
+      "cantidad": 2,
+      "costo": 12000
+    },
+    {
+      "nombre": "Archiveros",
+      "cantidad": 2,
+      "costo": 4500
+    },
+    {
+      "nombre": "Equipo de Cómputo",
+      "cantidad": 4,
+      "costo": 18000
+    },
+    {
+      "nombre": "Iluminación Decorativa",
+      "cantidad": 1,
+      "costo": 25000
+    },
+    {
+      "nombre": "Sofás / Sala de Espera",
+      "cantidad": 1,
+      "costo": 70000
+    },
+    {
+      "nombre": "Pantalla / Proyector",
+      "cantidad": 1,
+      "costo": 22000
+    },
+    {
+      "nombre": "Señalética y Branding",
+      "cantidad": 1,
+      "costo": 15000
+    },
+    {
+      "nombre": "Menaje y Detalles",
+      "cantidad": 1,
+      "costo": 18000
+    }
+  ],
+  "obraItems": [
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    },
+    {
+      "nombre": "",
+      "cantidad": 1,
+      "costo": 0
+    }
+  ]
+}

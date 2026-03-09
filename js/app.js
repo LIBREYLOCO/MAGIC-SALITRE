@@ -97,6 +97,12 @@ const App = (() => {
   };
 
   let state = {};
+  let escenariosDb = [];        // cache en memoria — espejo del servidor
+  let _saveStateTimer = null;      // debounce para no saturar el servidor
+  let currentRole = 'viewer';  // rol del usuario activo
+  let currentProjectId = null;     // proyecto activo en sesión
+  let projectsList = [];        // lista de proyectos disponibles
+  let usersDb = [];        // cache de usuarios (solo admin)
   let currentView = 'dashboard';
   let isPDFMode = false; // Flag para condensar tablas en exportación PDF
   let charts = [];
@@ -106,16 +112,52 @@ const App = (() => {
   const M = (val) => MXN.format(val || 0);
 
   function saveState() {
+    if (currentRole === 'viewer') return; // solo lectura — no guardar
+    // Guarda inmediatamente en localStorage (sin bloquear UI)
     localStorage.setItem('lyl_bienraiz_state', JSON.stringify(state));
+    // Envía al servidor con debounce de 600ms para no saturar en cada tecla
+    if (_saveStateTimer) clearTimeout(_saveStateTimer);
+    _saveStateTimer = setTimeout(() => {
+      fetch('/api/state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state)
+      }).catch(() => { }); // silencioso — localStorage ya tiene la copia
+    }, 600);
   }
 
-  function loadState() {
+  async function loadState() {
+    try {
+      const res = await fetch('/api/state');
+      const data = await res.json();
+      if (data.state) {
+        localStorage.setItem('lyl_bienraiz_state', JSON.stringify(data.state));
+        return data.state;
+      }
+    } catch (_) { }
+    // Fallback: localStorage (modo offline o servidor no disponible)
     try {
       const s = localStorage.getItem('lyl_bienraiz_state');
-      return s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULTS));
-    } catch (e) {
+      const parsed = s ? JSON.parse(s) : null;
+      return parsed || JSON.parse(JSON.stringify(DEFAULTS));
+    } catch (_) {
       return JSON.parse(JSON.stringify(DEFAULTS));
     }
+  }
+
+  async function loadEscenarios() {
+    try {
+      const res = await fetch('/api/escenarios');
+      const data = await res.json();
+      if (Array.isArray(data.escenarios)) {
+        localStorage.setItem('lil_escenarios_db', JSON.stringify(data.escenarios));
+        return data.escenarios;
+      }
+    } catch (_) { }
+    // Fallback: localStorage
+    try {
+      return JSON.parse(localStorage.getItem('lil_escenarios_db') || '[]');
+    } catch (_) { return []; }
   }
 
   // ============================================================
@@ -1742,10 +1784,7 @@ const App = (() => {
   function renderEscenarios() {
     // Escenarios will be read from LocalStorage keys dynamically.
     // For simplicity, we just use a subkey inside localStorage "lil_escenarios_db"
-    let escenariosGuardados = [];
-    try {
-      escenariosGuardados = JSON.parse(localStorage.getItem('lil_escenarios_db') || '[]');
-    } catch (e) { }
+    const escenariosGuardados = escenariosDb;
 
     let listHtml = '';
     if (escenariosGuardados.length === 0) {
@@ -1955,6 +1994,216 @@ const App = (() => {
     return html;
   }
 
+  // ============================================================
+  // ROLES Y PROYECTOS
+  // ============================================================
+
+  function renderProjectSelector() {
+    const el = document.getElementById('project-selector');
+    if (!el) return;
+    if (projectsList.length === 0) {
+      el.innerHTML = '<div class="proj-sel-empty">Sin proyectos</div>';
+      return;
+    }
+    const options = projectsList.map(p =>
+      `<option value="${p.id}" ${p.id === currentProjectId ? 'selected' : ''}>${p.nombre}</option>`
+    ).join('');
+    const adminBtn = currentRole === 'admin'
+      ? `<button class="proj-sel-btn" onclick="App.navigate('proyectos')" title="Gestionar proyectos">
+           <svg viewBox="0 0 16 16" width="12" height="12" fill="none">
+             <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+           </svg>
+         </button>`
+      : '';
+    el.innerHTML = `<div class="proj-sel-wrap">
+      <select class="proj-sel-select" onchange="App.switchProject(this.value)">${options}</select>
+      ${adminBtn}
+    </div>`;
+  }
+
+  function updateAdminVisibility() {
+    const isAdmin = currentRole === 'admin';
+    document.querySelectorAll('.nav-admin-only').forEach(el => {
+      el.style.display = isAdmin ? '' : 'none';
+    });
+    // Indicador de rol en sidebar
+    const roleEl = document.getElementById('user-role-badge');
+    if (roleEl) {
+      const labels = { admin: 'Administrador', editor: 'Editor', viewer: 'Solo lectura' };
+      const colors = { admin: '#C5A059', editor: '#3A8F6C', viewer: '#888' };
+      roleEl.textContent = labels[currentRole] || currentRole;
+      roleEl.style.background = colors[currentRole] || '#888';
+    }
+  }
+
+  async function switchProject(projectId) {
+    if (projectId === currentProjectId) return;
+    try {
+      await fetch('/api/projects/current', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId })
+      });
+      currentProjectId = projectId;
+      [state, escenariosDb] = await Promise.all([loadState(), loadEscenarios()]);
+      // Aplicar migraciones
+      if (!state.showroomItems) state.showroomItems = JSON.parse(JSON.stringify(DEFAULTS.showroomItems));
+      if (!state.obraItems) state.obraItems = JSON.parse(JSON.stringify(DEFAULTS.obraItems));
+      state.tickets.forEach(t => {
+        if (t.esAportado === undefined) t.esAportado = (t.nombre === 'Capital Tierra');
+        if (t.esTerrenoFijo === undefined) t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado);
+      });
+      renderProjectSelector();
+      navigate('dashboard');
+    } catch (_) { alert('Error al cambiar de proyecto.'); }
+  }
+
+  // ── Vistas de administración ──────────────────────────────────────────────
+
+  function renderProyectos() {
+    const isAdmin = currentRole === 'admin';
+    const rows = projectsList.map(p => {
+      const isCurrent = p.id === currentProjectId;
+      const fecha = new Date(p.createdAt).toLocaleDateString('es-MX');
+      return `<tr style="background:${isCurrent ? 'rgba(197,160,89,.07)' : '#fff'}; border-bottom:1px solid #eee;">
+        <td style="padding:12px 16px; font-weight:${isCurrent ? '600' : '400'}; color:var(--navy);">
+          ${p.nombre}
+          ${isCurrent ? '<span style="font-size:10px;background:#C5A059;color:#fff;padding:2px 7px;border-radius:10px;margin-left:8px;">Activo</span>' : ''}
+        </td>
+        <td style="padding:12px 16px; color:#666; font-size:13px;">${p.descripcion || '—'}</td>
+        <td style="padding:12px 16px; color:#999; font-size:12px;">${fecha}</td>
+        <td style="padding:12px 16px; display:flex; gap:6px; flex-wrap:wrap;">
+          ${!isCurrent ? `<button onclick="App.switchProject('${p.id}')" class="btn-accion btn-accion-primario">Activar</button>` : ''}
+          ${isAdmin && !isCurrent ? `<button onclick="App.deleteProject('${p.id}')" class="btn-accion btn-accion-peligro">Borrar</button>` : ''}
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="4" style="padding:24px;text-align:center;color:#999;">Sin proyectos registrados.</td></tr>`;
+
+    const formNuevo = isAdmin ? `
+      <div class="admin-form-box">
+        <h3 class="admin-form-title">Nuevo Proyecto</h3>
+        <div style="display:grid;gap:10px;max-width:420px;">
+          <input id="new-proj-nombre" class="form-input" placeholder="Nombre del proyecto" data-is-text="1">
+          <input id="new-proj-desc"   class="form-input" placeholder="Descripción (opcional)" data-is-text="1">
+          <button onclick="App.createProject()" class="btn-full-report" style="width:auto;padding:9px 20px;">Crear Proyecto</button>
+        </div>
+      </div>` : '';
+
+    return `<div class="view-section">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#f5f5f5;font-size:11px;text-transform:uppercase;color:#888;letter-spacing:.5px;">
+          <th style="padding:10px 16px;text-align:left;">Nombre</th>
+          <th style="padding:10px 16px;text-align:left;">Descripción</th>
+          <th style="padding:10px 16px;text-align:left;">Creado</th>
+          <th style="padding:10px 16px;text-align:left;">Acciones</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${formNuevo}
+    </div>`;
+  }
+
+  function renderUsuarios() {
+    const rolLabel = { admin: 'Administrador', editor: 'Editor', viewer: 'Solo lectura' };
+    const rolColor = { admin: '#C5A059', editor: '#3A8F6C', viewer: '#888' };
+
+    const rows = usersDb.map(u => {
+      return `<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:12px 16px; font-weight:500; color:var(--navy);">${u.name}</td>
+        <td style="padding:12px 16px; color:#555; font-size:13px;">${u.email}</td>
+        <td style="padding:12px 16px;">
+          <span style="font-size:11px;background:${rolColor[u.role]};color:#fff;padding:2px 8px;border-radius:10px;">${rolLabel[u.role] || u.role}</span>
+        </td>
+        <td style="padding:12px 16px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <select onchange="App.updateUserRole(${u.id}, this.value)" style="font-size:12px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
+            <option value="admin"  ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+            <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Editor</option>
+            <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+          </select>
+          <button onclick="App.deleteUser(${u.id})" class="btn-accion btn-accion-peligro">Borrar</button>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="4" style="padding:24px;text-align:center;color:#999;">Sin usuarios registrados.</td></tr>`;
+
+    return `<div class="view-section">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#f5f5f5;font-size:11px;text-transform:uppercase;color:#888;letter-spacing:.5px;">
+          <th style="padding:10px 16px;text-align:left;">Nombre</th>
+          <th style="padding:10px 16px;text-align:left;">Correo</th>
+          <th style="padding:10px 16px;text-align:left;">Rol</th>
+          <th style="padding:10px 16px;text-align:left;">Acciones</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="admin-form-box">
+        <h3 class="admin-form-title">Nuevo Usuario</h3>
+        <div style="display:grid;gap:10px;max-width:420px;">
+          <input id="new-user-name"     class="form-input" placeholder="Nombre" data-is-text="1">
+          <input id="new-user-email"    class="form-input" placeholder="Correo electrónico" data-is-text="1">
+          <input id="new-user-pwd"      class="form-input" placeholder="Contraseña" type="password" data-is-text="1">
+          <select id="new-user-role"    style="font-size:13px;padding:8px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;">
+            <option value="viewer">Solo lectura</option>
+            <option value="editor">Editor</option>
+            <option value="admin">Administrador</option>
+          </select>
+          <button onclick="App.createUser()" class="btn-full-report" style="width:auto;padding:9px 20px;">Crear Usuario</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── Acciones de administración ────────────────────────────────────────────
+
+  async function createProject() {
+    const nombre = document.getElementById('new-proj-nombre')?.value.trim();
+    const desc = document.getElementById('new-proj-desc')?.value.trim();
+    if (!nombre) { alert('Ingresa un nombre para el proyecto.'); return; }
+    const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre, descripcion: desc }) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Error al crear proyecto'); return; }
+    projectsList.push({ id: data.id, nombre, descripcion: desc, createdAt: Date.now() });
+    renderProjectSelector();
+    navigate('proyectos');
+  }
+
+  async function deleteProject(id) {
+    if (!confirm('¿Borrar este proyecto y todos sus datos? Esta acción no se puede deshacer.')) return;
+    const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+    if (!res.ok) { alert('Error al borrar proyecto'); return; }
+    projectsList = projectsList.filter(p => p.id !== id);
+    renderProjectSelector();
+    navigate('proyectos');
+  }
+
+  async function createUser() {
+    const name = document.getElementById('new-user-name')?.value.trim();
+    const email = document.getElementById('new-user-email')?.value.trim();
+    const pwd = document.getElementById('new-user-pwd')?.value;
+    const role = document.getElementById('new-user-role')?.value;
+    if (!email || !pwd) { alert('Correo y contraseña son requeridos.'); return; }
+    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pwd, role }) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Error al crear usuario'); return; }
+    usersDb.push({ id: data.id, name: name || email, email, role: role || 'viewer' });
+    navigate('usuarios');
+  }
+
+  async function deleteUser(id) {
+    if (!confirm('¿Eliminar este usuario permanentemente?')) return;
+    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Error'); return; }
+    usersDb = usersDb.filter(u => u.id !== id);
+    navigate('usuarios');
+  }
+
+  async function updateUserRole(id, role) {
+    const res = await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+    if (!res.ok) { alert('Error al actualizar rol'); return; }
+    const u = usersDb.find(u => u.id === id);
+    if (u) u.role = role;
+    navigate('usuarios');
+  }
+
   const RENDERERS = {
     dashboard: renderDashboard,
     parametros: renderParametros,
@@ -1965,7 +2214,9 @@ const App = (() => {
     proyeccion: renderProyeccion,
     escenarios: renderEscenarios,
     'escenarios-financieros': renderEscenariosFinancieros,
-    reportes: renderReportes
+    reportes: renderReportes,
+    proyectos: renderProyectos,
+    usuarios: renderUsuarios
   };
 
   const VIEW_TITLES = {
@@ -1978,7 +2229,9 @@ const App = (() => {
     proyeccion: 'Corrida Financiera',
     escenarios: 'Gestión de Escenarios',
     'escenarios-financieros': 'Escenarios Financieros',
-    reportes: 'Reportes e Indicadores'
+    reportes: 'Reportes e Indicadores',
+    proyectos: 'Gestión de Proyectos',
+    usuarios: 'Gestión de Usuarios'
   };
 
   function destroyCharts() {
@@ -2441,8 +2694,9 @@ const App = (() => {
     }
   }
 
-  function logout() {
-    localStorage.removeItem('lil_auth');
+  async function logout() {
+    // Destruir sesión en el servidor
+    try { await fetch('/api/logout', { method: 'POST' }); } catch (_) { }
     const portal = document.getElementById('login-portal');
     if (portal) {
       portal.style.display = 'flex';
@@ -2468,31 +2722,24 @@ const App = (() => {
     if (!nameInput) return;
     const nombre = nameInput.value.trim() || 'Escenario sin nombre';
 
-    let db = [];
-    try {
-      db = JSON.parse(localStorage.getItem('lil_escenarios_db') || '[]');
-    } catch (e) { }
+    const item = { nombre, timestamp: Date.now(), state: JSON.parse(JSON.stringify(state)) };
+    escenariosDb.push(item);
 
-    // Guardar copia profunda del state
-    const snapshot = JSON.parse(JSON.stringify(state));
-    db.push({
-      nombre: nombre,
-      timestamp: Date.now(),
-      state: snapshot
+    // Persistir en servidor (fire & forget) y localStorage como fallback
+    fetch('/api/escenarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item)
+    }).catch(() => {
+      localStorage.setItem('lil_escenarios_db', JSON.stringify(escenariosDb));
     });
 
-    localStorage.setItem('lil_escenarios_db', JSON.stringify(db));
-    navigate('escenarios'); // refresca la vista
+    navigate('escenarios');
   }
 
   function loadEscenario(index) {
-    let db = [];
-    try {
-      db = JSON.parse(localStorage.getItem('lil_escenarios_db') || '[]');
-    } catch (e) { }
-
-    if (db[index]) {
-      state = JSON.parse(JSON.stringify(db[index].state));
+    if (escenariosDb[index]) {
+      state = JSON.parse(JSON.stringify(escenariosDb[index].state));
       saveState();
       navigate('escenarios');
     }
@@ -2500,16 +2747,16 @@ const App = (() => {
 
   function deleteEscenario(index) {
     if (!confirm("¿Estás seguro de que deseas borrar este ejercicio guardado?")) return;
-    let db = [];
-    try {
-      db = JSON.parse(localStorage.getItem('lil_escenarios_db') || '[]');
-    } catch (e) { }
+    if (index < 0 || index >= escenariosDb.length) return;
 
-    if (db[index]) {
-      db.splice(index, 1);
-      localStorage.setItem('lil_escenarios_db', JSON.stringify(db));
-      navigate('escenarios');
-    }
+    escenariosDb.splice(index, 1);
+
+    fetch(`/api/escenarios/${index}`, { method: 'DELETE' })
+      .catch(() => {
+        localStorage.setItem('lil_escenarios_db', JSON.stringify(escenariosDb));
+      });
+
+    navigate('escenarios');
   }
 
   function resetToFactory() {
@@ -2555,53 +2802,89 @@ const App = (() => {
     navigate('proyeccion');
   }
 
-  function init() {
-    state = loadState();
-    // Migración: showroomItems
-    if (!state.showroomItems) {
-      state.showroomItems = JSON.parse(JSON.stringify(DEFAULTS.showroomItems));
-    }
-    // Migración: obraItems
-    if (!state.obraItems) {
-      state.obraItems = JSON.parse(JSON.stringify(DEFAULTS.obraItems));
-    }
-    // Migración: esAportado y esTerrenoFijo en tickets existentes
-    let stateDirty = false;
-    state.tickets.forEach(t => {
-      if (t.esAportado === undefined) {
-        t.esAportado = (t.nombre === 'Capital Tierra');
-        stateDirty = true;
+  async function init() {
+    try {
+      // Cargar todo en paralelo: info de sesión + estado + escenarios
+      const [authInfo, loadedState, loadedScenarios] = await Promise.all([
+        fetch('/api/check-auth').then(r => r.json()).catch(() => ({})),
+        loadState(),
+        loadEscenarios()
+      ]);
+
+      currentRole = authInfo.role || 'viewer';
+      currentProjectId = authInfo.currentProjectId || null;
+      projectsList = authInfo.projects || [];
+      state = loadedState || JSON.parse(JSON.stringify(DEFAULTS));
+      escenariosDb = loadedScenarios || [];
+
+      // Cargar usuarios si es admin
+      if (currentRole === 'admin') {
+        fetch('/api/users').then(r => r.json()).then(d => { usersDb = d.users || []; }).catch(() => { });
       }
-      if (t.esTerrenoFijo === undefined) {
-        t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado);
-        stateDirty = true;
+
+      // Aplicar clase de rol al layout para CSS
+      const layout = document.getElementById('app-layout');
+      if (layout) {
+        layout.classList.toggle('role-viewer', currentRole === 'viewer');
+        layout.classList.toggle('role-admin', currentRole === 'admin');
+        layout.classList.toggle('role-editor', currentRole === 'editor');
       }
-    });
-    if (stateDirty || !state.showroomItems) saveState();
 
-    // Navegación
-    document.querySelectorAll('.nav-item[data-view]').forEach(el =>
-      el.addEventListener('click', () => {
-        // Remover 'active' handling manual para móviles si fuera necesario
-        navigate(el.dataset.view);
-      })
-    );
+      // Renderizar selector de proyecto y visibilidad de items admin
+      renderProjectSelector();
+      updateAdminVisibility();
 
-    // Auto-formateo Moneda
-    document.addEventListener('focus', e => {
-      const el = e.target;
-      if (!el.matches('input.form-input') || el.dataset.isText) return;
-      const v = parseFloat(String(el.value).replace(/[$,\\s]/g, ''));
-      if (!isNaN(v)) el.value = v;
-    }, true);
-    document.addEventListener('blur', e => {
-      const el = e.target;
-      if (!el.matches('input.form-input') || el.dataset.isText) return;
-      const v = parseFloat(String(el.value).replace(/[$,\\s]/g, ''));
-      if (!isNaN(v)) el.value = MXN.format(v);
-    }, true);
+      // ── Migraciones / guards defensivos ─────────────────────────
+      if (!state.variables) state.variables = JSON.parse(JSON.stringify(DEFAULTS.variables));
+      if (!state.tickets) state.tickets = JSON.parse(JSON.stringify(DEFAULTS.tickets));
+      if (!state.egresos) state.egresos = JSON.parse(JSON.stringify(DEFAULTS.egresos));
+      if (!state.showroomItems) state.showroomItems = JSON.parse(JSON.stringify(DEFAULTS.showroomItems));
+      if (!state.obraItems) state.obraItems = JSON.parse(JSON.stringify(DEFAULTS.obraItems));
 
-    navigate('dashboard');
+      let stateDirty = false;
+      if (Array.isArray(state.tickets)) {
+        state.tickets.forEach(t => {
+          if (t.esAportado === undefined) {
+            t.esAportado = (t.nombre === 'Capital Tierra');
+            stateDirty = true;
+          }
+          if (t.esTerrenoFijo === undefined) {
+            t.esTerrenoFijo = (t.nombre === 'Capital Tierra' && t.esAportado);
+            stateDirty = true;
+          }
+        });
+      }
+      if (stateDirty) saveState();
+
+      // Navegación
+      document.querySelectorAll('.nav-item[data-view]').forEach(el =>
+        el.addEventListener('click', () => {
+          // Remover 'active' handling manual para móviles si fuera necesario
+          navigate(el.dataset.view);
+        })
+      );
+
+      // Auto-formateo Moneda
+      document.addEventListener('focus', e => {
+        const el = e.target;
+        if (!el.matches('input.form-input') || el.dataset.isText) return;
+        const v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
+        if (!isNaN(v)) el.value = v;
+      }, true);
+      document.addEventListener('blur', e => {
+        const el = e.target;
+        if (!el.matches('input.form-input') || el.dataset.isText) return;
+        const v = parseFloat(String(el.value).replace(/[$,\s]/g, ''));
+        if (!isNaN(v)) el.value = MXN.format(v);
+      }, true);
+
+      navigate('dashboard');
+    } catch (err) {
+      console.error("Critical Init Error:", err);
+      // Fallback extremo: limpiar y recargar con DEFAULTS
+      state = JSON.parse(JSON.stringify(DEFAULTS));
+      navigate('dashboard');
+    }
   }
 
   return {
@@ -2612,7 +2895,11 @@ const App = (() => {
     saveEscenario, loadEscenario, deleteEscenario,
     resetToFactory, resetState: resetToFactory,
     switchReportTab, switchParamTab, switchProyeccionTab,
-    updateOcupacion, logout
+    updateOcupacion, logout,
+    // Roles y proyectos
+    switchProject, createProject, deleteProject,
+    // Gestión de usuarios
+    createUser, deleteUser, updateUserRole
   };
 
 })();

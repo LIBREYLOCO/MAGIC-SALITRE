@@ -1439,3 +1439,92 @@ tbody td:first-child {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   SELECTOR DE PROYECTO
+═══════════════════════════════════════════════════════ */
+.proj-sel-container {
+  padding: 8px 12px 4px;
+}
+.proj-sel-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.proj-sel-select {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  color: var(--navy);
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(197,160,89,.3);
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+}
+.proj-sel-select:focus { border-color: #C5A059; }
+.proj-sel-btn {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  background: rgba(197,160,89,.2);
+  border: 1px solid rgba(197,160,89,.4);
+  border-radius: 5px;
+  color: #C5A059;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.proj-sel-btn:hover { background: rgba(197,160,89,.35); }
+.proj-sel-empty {
+  font-size: 11px; color: #888; padding: 4px 2px;
+}
+.app-layout.sidebar-collapsed .proj-sel-container { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+   MODO SOLO LECTURA (viewer)
+═══════════════════════════════════════════════════════ */
+.role-viewer .form-input {
+  pointer-events: none;
+  background: rgba(0,0,0,.04) !important;
+  color: #555 !important;
+  cursor: default;
+}
+.role-viewer .btn-reset,
+.role-viewer #btn-export-csv {
+  opacity: .4;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   VISTAS DE ADMINISTRACIÓN
+═══════════════════════════════════════════════════════ */
+.admin-form-box {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+.admin-form-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0 0 14px;
+}
+.btn-accion {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  transition: opacity .15s;
+}
+.btn-accion:hover { opacity: .8; }
+.btn-accion-primario { background: var(--navy); color: #fff; }
+.btn-accion-peligro  { background: #e74c3c;     color: #fff; }
