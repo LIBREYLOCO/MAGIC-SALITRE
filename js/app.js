@@ -2811,6 +2811,12 @@ const App = (() => {
         loadEscenarios()
       ]);
 
+      // Merge mock auth if present (for static hosting demo)
+      const mockAuth = JSON.parse(localStorage.getItem('lyl_mock_auth') || 'null');
+      if (mockAuth && (!authInfo.authenticated)) {
+        Object.assign(authInfo, mockAuth, { authenticated: true });
+      }
+
       currentRole = authInfo.role || 'viewer';
       currentProjectId = authInfo.currentProjectId || null;
       projectsList = authInfo.projects || [];

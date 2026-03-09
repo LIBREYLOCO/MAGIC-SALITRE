@@ -883,6 +883,7 @@
 
         // Fallback local si el servidor responde con error (ej. 404 en hosting estático)
         if (email === MOCK_EMAIL && pwd === MOCK_PASS) {
+          localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: 'Admin', role: 'admin' }));
           finishLogin();
         } else {
           const data = await res.json().catch(() => ({}));
@@ -893,6 +894,7 @@
       } catch (_) {
         // Fallback local si no hay servidor (conexión rechazada/offline)
         if (email === MOCK_EMAIL && pwd === MOCK_PASS) {
+          localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: 'Admin', role: 'admin' }));
           finishLogin();
         } else {
           err.textContent = 'Error de conexión / Credenciales incorrectas.';
