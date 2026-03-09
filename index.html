@@ -140,8 +140,10 @@
             </div>
           </div>
           <div class="lp-error" id="lp-error">Acceso denegado.</div>
-          <button type="submit" class="lp-btn" id="lp-btn">
-            <span id="lp-btn-text">Accesar al sistema</span>
+          <button type="submit" class="lp-btn" id="lp-btn"
+            style="background: var(--gold-gradient); box-shadow: 0 4px 20px rgba(197, 160, 89, 0.4); border: 1px solid var(--gold-bright);">
+            <span id="lp-btn-text" style="font-weight:600; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">Accesar al
+              sistema</span>
             <span id="lp-btn-spin" class="lp-spinner" style="display:none"></span>
           </button>
         </form>
@@ -175,26 +177,26 @@
     /* Side panels — blur sobre la imagen de fondo */
     .lp-side {
       flex: 1;
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      background: rgba(0, 0, 0, 0.10);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(0, 0, 0, 0.25);
     }
 
     /* Center terracotta band */
     .lp-center {
       position: relative;
       width: min(560px, 90vw);
-      /* Aumentado de 52vw para mejor visualización en móviles */
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background:
-        radial-gradient(ellipse 80% 60% at 15% 10%, #A04030 0%, transparent 50%),
-        radial-gradient(ellipse 70% 70% at 85% 90%, #5C1E0F 0%, transparent 55%),
-        radial-gradient(ellipse 120% 120% at 50% 50%, #7A2D1A 0%, #47180A 50%, #1C0705 100%);
-      box-shadow: -16px 0 50px rgba(0, 0, 0, .65), 16px 0 50px rgba(0, 0, 0, .65);
+      background: rgba(58, 28, 21, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: -15px 0 60px rgba(0, 0, 0, .8), 15px 0 60px rgba(0, 0, 0, .8);
       overflow: hidden;
+      border-left: 1px solid rgba(197, 160, 89, 0.2);
+      border-right: 1px solid rgba(197, 160, 89, 0.2);
     }
 
     #login-portal.lp-exit {

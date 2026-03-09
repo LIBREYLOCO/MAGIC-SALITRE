@@ -1707,7 +1707,7 @@ const App = (() => {
 
     <div class="card" style="padding:24px; background:var(--navy); color:white; text-align:center;">
       <div style="font-size:12px; text-transform:uppercase; letter-spacing:2px; color:#C5A059; margin-bottom:8px;">Presupuesto General Requerido</div>
-      <div style="font-size:36px; font-weight:300; margin-bottom:16px; line-height:1;">${M(presupuestoCompleto)}</div>
+      <div style="font-size:36px; font-weight:700; margin-bottom:16px; line-height:1; background: var(--gold-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${M(presupuestoCompleto)}</div>
       <div style="display:flex; justify-content:center; gap:32px; flex-wrap:wrap; font-size:13px; color:rgba(255,255,255,0.7);">
         <span>Obra Civil: <strong style="color:white;">${M(totalObra)}</strong></span>
         <span>Terreno: <strong style="color:white;">${M(terreno)}</strong></span>
@@ -1814,7 +1814,7 @@ const App = (() => {
               <div style="font-size:11px; color:var(--text-muted);">Guardado el: ${new Date(esc.timestamp).toLocaleString()}</div>
             </div>
             <div style="display:flex; gap:8px;">
-              <button onclick="App.loadEscenario(${idx})" style="padding:6px 12px; font-size:12px; font-weight:600; border-radius:4px; background:var(--navy); color:white; border:none; cursor:pointer;">Cargar</button>
+              <button onclick="App.loadEscenario(${idx})" class="btn-primary" style="padding:6px 12px; font-size:12px;">Cargar</button>
               <button onclick="App.deleteEscenario(${idx})" style="padding:6px 12px; font-size:12px; font-weight:600; border-radius:4px; background:#E8A090; color:white; border:none; cursor:pointer;">Borrar</button>
             </div>
           </div>
@@ -1847,7 +1847,7 @@ const App = (() => {
         <label style="font-size:11px; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px">Nombre del Ejercicio (Escenario)</label>
         <div style="display:flex; gap:12px;">
           <input type="text" id="nuevo-escenario-nombre" placeholder="Ej. Escenario Conservador Alta Comisión" style="flex:1; border:1px solid #ddd; padding:10px; border-radius:4px; font-size:13px;">
-          <button onclick="App.saveEscenario()" style="padding:10px 20px; font-size:13px; font-weight:600; color:white; background:#C5A059; border:none; border-radius:4px; cursor:pointer;">Guardar</button>
+          <button onclick="App.saveEscenario()" class="btn-primary" style="padding:10px 20px; font-size:13px;">Guardar</button>
         </div>
         
         <div style="margin-top:32px; padding-top:20px; border-top:1px solid #eee;">

@@ -19,9 +19,16 @@
 
   --gold: #C5A059;
   /* acento luxe: totales, branding, utilidad */
-  --gold-bright: #D9B56A;
+  --gold-bright: #F1D399;
+  --gold-gradient: linear-gradient(135deg, #C5A059 0%, #F1D399 50%, #C5A059 100%);
   --gold-dim: rgba(197, 160, 89, .10);
   --gold-border: rgba(197, 160, 89, .30);
+
+  /* ── Glassmorphism ── */
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-sidebar: rgba(58, 28, 21, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --blur: blur(12px);
 
   /* ── Fondo y superficies ── */
   --bg: #FAFAFA;
@@ -114,6 +121,21 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--gold-gradient);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(197, 160, 89, 0.4);
 }
 
 /* ── Scrollbar ── */
@@ -153,15 +175,17 @@ button {
 .sidebar {
   display: flex;
   flex-direction: column;
-  background: var(--navy);
-  border-right: 1px solid rgba(255, 255, 255, .06);
+  background: var(--glass-sidebar);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-right: 1px solid rgba(255, 255, 255, .08);
   height: 100vh;
   position: sticky;
   top: 0;
   overflow: hidden;
   z-index: 100;
   width: var(--sidebar-w);
-  transition: width .28s ease, opacity .28s ease;
+  transition: width .28s cubic-bezier(0.4, 0, 0.2, 1), opacity .28s ease;
 }
 
 .app-layout.sidebar-collapsed .sidebar {
@@ -333,10 +357,11 @@ button {
 }
 
 .nav-item.active {
-  color: var(--gold);
-  background: rgba(197, 160, 89, .12);
-  border-left-color: var(--gold);
-  font-weight: 400;
+  color: #fff;
+  background: var(--gold-gradient);
+  border-left-color: var(--gold-bright);
+  font-weight: 500;
+  box-shadow: 0 2px 10px rgba(197, 160, 89, 0.2);
 }
 
 .nav-icon {
@@ -541,13 +566,21 @@ button {
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-border);
   border-top: 3px solid var(--gold);
   border-radius: var(--radius-lg);
   padding: 22px 26px;
   margin-bottom: 18px;
   box-shadow: var(--shadow);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
 }
 
 .card-title {
@@ -586,7 +619,8 @@ button {
 
 .kpi-card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  transform: translateY(-4px) scale(1.02);
+  border-top-color: var(--gold-bright);
 }
 
 .kpi-card.gold {
@@ -598,9 +632,9 @@ button {
 }
 
 .kpi-label {
-  font-size: 11.5px;
-  font-weight: 400;
-  letter-spacing: 1.4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -611,6 +645,14 @@ button {
   color: var(--navy);
   letter-spacing: -.5px;
   line-height: 1.15;
+}
+
+.kpi-card.gold .kpi-value {
+  background: var(--gold-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
 }
 
 .kpi-value.positive {
@@ -1446,11 +1488,13 @@ tbody td:first-child {
 .proj-sel-container {
   padding: 8px 12px 4px;
 }
+
 .proj-sel-wrap {
   display: flex;
   align-items: center;
   gap: 6px;
 }
+
 .proj-sel-select {
   flex: 1;
   min-width: 0;
@@ -1458,41 +1502,58 @@ tbody td:first-child {
   font-family: 'Montserrat', sans-serif;
   font-weight: 500;
   color: var(--navy);
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(197,160,89,.3);
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(197, 160, 89, .3);
   border-radius: 5px;
   padding: 5px 8px;
   cursor: pointer;
   outline: none;
   appearance: auto;
 }
-.proj-sel-select:focus { border-color: #C5A059; }
+
+.proj-sel-select:focus {
+  border-color: #C5A059;
+}
+
 .proj-sel-btn {
   flex-shrink: 0;
-  width: 26px; height: 26px;
-  background: rgba(197,160,89,.2);
-  border: 1px solid rgba(197,160,89,.4);
+  width: 26px;
+  height: 26px;
+  background: rgba(197, 160, 89, .2);
+  border: 1px solid rgba(197, 160, 89, .4);
   border-radius: 5px;
   color: #C5A059;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background .15s;
 }
-.proj-sel-btn:hover { background: rgba(197,160,89,.35); }
-.proj-sel-empty {
-  font-size: 11px; color: #888; padding: 4px 2px;
+
+.proj-sel-btn:hover {
+  background: rgba(197, 160, 89, .35);
 }
-.app-layout.sidebar-collapsed .proj-sel-container { display: none; }
+
+.proj-sel-empty {
+  font-size: 11px;
+  color: #888;
+  padding: 4px 2px;
+}
+
+.app-layout.sidebar-collapsed .proj-sel-container {
+  display: none;
+}
 
 /* ═══════════════════════════════════════════════════════
    MODO SOLO LECTURA (viewer)
 ═══════════════════════════════════════════════════════ */
 .role-viewer .form-input {
   pointer-events: none;
-  background: rgba(0,0,0,.04) !important;
+  background: rgba(0, 0, 0, .04) !important;
   color: #555 !important;
   cursor: default;
 }
+
 .role-viewer .btn-reset,
 .role-viewer #btn-export-csv {
   opacity: .4;
@@ -1509,12 +1570,14 @@ tbody td:first-child {
   border-radius: 8px;
   border: 1px solid #eee;
 }
+
 .admin-form-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--navy);
   margin: 0 0 14px;
 }
+
 .btn-accion {
   font-size: 12px;
   padding: 4px 12px;
@@ -1525,6 +1588,17 @@ tbody td:first-child {
   font-weight: 500;
   transition: opacity .15s;
 }
-.btn-accion:hover { opacity: .8; }
-.btn-accion-primario { background: var(--navy); color: #fff; }
-.btn-accion-peligro  { background: #e74c3c;     color: #fff; }
+
+.btn-accion:hover {
+  opacity: .8;
+}
+
+.btn-accion-primario {
+  background: var(--navy);
+  color: #fff;
+}
+
+.btn-accion-peligro {
+  background: #e74c3c;
+  color: #fff;
+}
