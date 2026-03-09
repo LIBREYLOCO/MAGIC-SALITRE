@@ -1,6 +1,15 @@
 [build]
   publish = "."
+  functions = "netlify/functions"
 
+# API → Netlify Function (debe ir ANTES del catch-all)
+[[redirects]]
+  from   = "/api/*"
+  to     = "/.netlify/functions/api"
+  status = 200
+  force  = true
+
+# SPA catch-all
 [[redirects]]
   from = "/*"
   to   = "/index.html"

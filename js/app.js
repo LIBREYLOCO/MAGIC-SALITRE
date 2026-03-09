@@ -175,16 +175,28 @@ const App = (() => {
   async function loadUsers() {
     try {
       const res = await fetch('/api/users');
-      const data = await res.json();
-      if (Array.isArray(data.users)) {
-        localStorage.setItem('lil_users_db', JSON.stringify(data.users));
-        return data.users;
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.users)) {
+          localStorage.setItem('lil_users_db', JSON.stringify(data.users));
+          return data.users;
+        }
       }
     } catch (_) { }
+    // Fallback 1: localStorage
     try {
       const u = localStorage.getItem('lil_users_db');
-      return u ? JSON.parse(u) : [];
-    } catch (_) { return []; }
+      if (u) return JSON.parse(u);
+    } catch (_) { }
+    // Fallback 2: data/users.json (siempre disponible en Netlify como archivo estático)
+    try {
+      const res = await fetch('data/users.json');
+      if (res.ok) {
+        const users = await res.json();
+        if (Array.isArray(users)) return users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
+      }
+    } catch (_) { }
+    return [];
   }
 
   // ============================================================
