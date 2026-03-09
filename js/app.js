@@ -3050,7 +3050,7 @@ const App = (() => {
   async function exportCurrentViewToPDF() {
     const element = document.getElementById('content-body');
     if (!element) { alert('No hay contenido para exportar.'); return; }
-    if (typeof html2canvas === 'undefined' || !window.jspdf) {
+    if (typeof html2pdf === 'undefined') {
       alert('Librería de PDF no disponible. Verifica tu conexión a internet.');
       return;
     }
@@ -3060,45 +3060,28 @@ const App = (() => {
 
     let wasDark = false;
     try {
-    // Activar modo condensado para PDF y FORZAR TEMA CLARO para impresión
     wasDark = document.body.classList.contains('dark-mode');
     if (wasDark) document.body.classList.remove('dark-mode');
     document.body.classList.add('pdf-export-active');
-
     isPDFMode = true;
-    navigate(currentView); // Forzar re-render con modo PDF
+    navigate(currentView);
+    await new Promise(r => setTimeout(r, 400)); // Esperar re-render
 
-    // Captura el contenido completo (scroll height)
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#f4f7fa',
-      logging: false,
-      foreignObjectRendering: false,
-      scrollX: 0,
-      scrollY: 0,
-      width: element.scrollWidth,
-      height: element.scrollHeight,
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight
-    });
-
-    // Encaja en UNA SOLA hoja carta apaisada
-    const { jsPDF } = window.jspdf;
-    const PAGE_W = 297, PAGE_H = 210, MARGIN = 7;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
-    _addCanvasToPage(doc, canvas, PAGE_W, PAGE_H, MARGIN, currentView.toUpperCase(), 1, 1);
-
-    // Abrir en nueva pestaña → el usuario elige imprimir o guardar como PDF
-    window.open(doc.output('bloburl'), '_blank');
+    const opt = {
+      margin: [8, 7, 8, 7],
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    const blobUrl = await html2pdf().set(opt).from(element).outputPdf('bloburl');
+    window.open(blobUrl, '_blank');
   } catch (err) {
     alert('Error al generar el PDF. Intenta de nuevo.');
   } finally {
     isPDFMode = false;
     document.body.classList.remove('pdf-export-active');
     if (wasDark) document.body.classList.add('dark-mode');
-    navigate(currentView); // Restaurar vista normal
+    navigate(currentView);
     if (btn) { btn.textContent = 'Vista actual'; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
   }
 }
@@ -3285,7 +3268,10 @@ const App = (() => {
       const el = document.getElementById('content-body');
       if (!el) continue;
 
-      // Captura el contenido completo de la vista (scroll height)
+      // Captura con proporción exacta A4 landscape (evita distorsión)
+      const A4_RATIO = 297 / 210;
+      const capW = el.scrollWidth;
+      const capH = Math.min(el.scrollHeight, Math.round(capW / A4_RATIO));
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
@@ -3295,10 +3281,10 @@ const App = (() => {
         foreignObjectRendering: false,
         scrollX: 0,
         scrollY: 0,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight
+        width: capW,
+        height: capH,
+        windowWidth: capW,
+        windowHeight: capH
       });
 
       doc.addPage();
