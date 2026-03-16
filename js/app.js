@@ -1973,7 +1973,7 @@ const App = (() => {
       <div style="font-size:12px; text-transform:uppercase; letter-spacing:2px; color:#C5A059; margin-bottom:8px;">Presupuesto General Requerido</div>
       <div style="font-size:36px; font-weight:700; margin-bottom:16px; line-height:1; background: var(--gold-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${M(presupuestoCompleto)}</div>
       <div style="display:flex; justify-content:center; gap:32px; flex-wrap:wrap; font-size:13px; color:rgba(255,255,255,0.7);">
-        <span>Obra Civil: <strong style="color:white;">${M(totalObra)}</strong></span>
+        <span>Obra Civil: <strong style="color:white;">${M(obraTotal)}</strong></span>
         <span>Terreno: <strong style="color:white;">${M(terreno)}</strong></span>
         <span>Comisiones: <strong style="color:#C5A059;">${M(comisionVentas)}</strong></span>
         <span>Preoperativos: <strong style="color:#C5A059;">${M(preoperativos)}</strong></span>
