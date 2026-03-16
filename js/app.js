@@ -384,6 +384,8 @@ const App = (() => {
       : (Number(v.costoCompraTerreno) || 0);
     const egresosTotales = egresosFijos + acop + comision + terrenoValor;
     const capitalNeto = entradas - egresosTotales;
+    const costoObra = (state.obraItems || []).reduce((s, it) => s + (Number(it.cantidad) * Number(it.costo)), 0);
+    const remanente = capitalNeto - costoObra;
 
     // KPIs derivados
     const capRate = entradas > 0 ? (ingresoAnualTotal / entradas) * 100 : 0;
@@ -476,62 +478,81 @@ const App = (() => {
       </div>
     </div>
 
-    <!-- Desglose doble -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
-
-      <!-- Fases de tickets -->
-      <div class="card" style="padding:0; overflow:hidden;">
-        <div style="padding:14px 20px; background:#f9fbfd; border-bottom:1px solid #eee;">
-          <span style="font-size:13px; font-weight:600; color:var(--navy);">Fases de Levantamiento</span>
+    <!-- Resumen Financiero Maestro -->
+    <div class="card" style="padding:0; overflow:hidden; margin-bottom:20px; border:2px solid var(--navy); box-shadow:0 8px 32px rgba(30,41,59,0.15);">
+      <div style="background:var(--navy); padding:18px 28px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#C5A059; letter-spacing:1px;">RESUMEN FINANCIERO DEL PROYECTO</div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:2px;">Destino completo del capital captado · Incluye costo de obra</div>
         </div>
-        <table style="width:100%; border-collapse:collapse; font-size:12px;">
-          <thead>
-            <tr style="border-bottom:1px solid #eee; color:var(--text-muted);">
-              <th style="padding:8px 16px; text-align:left; font-weight:500;">Fase</th>
-              <th style="padding:8px 8px; text-align:center; font-weight:500;">Tickets</th>
-              <th style="padding:8px 16px; text-align:right; font-weight:500;">Precio</th>
-              <th style="padding:8px 16px; text-align:right; font-weight:500;">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.tickets.map(t => {
-      const sub = (Number(t.cantidad) || 0) * (Number(t.precio) || 0);
-      return `<tr style="border-bottom:1px solid #f5f5f5;">
-                <td style="padding:8px 16px; color:var(--navy); font-weight:500;">${t.nombre}</td>
-                <td style="padding:8px 8px; text-align:center; color:var(--text-muted);">${t.cantidad}</td>
-                <td style="padding:8px 16px; text-align:right; color:var(--text-muted);">${M(t.precio)}</td>
-                <td style="padding:8px 16px; text-align:right; font-weight:600; color:var(--navy);">${M(sub)}</td>
-              </tr>`;
-    }).join('')}
-          </tbody>
-          <tfoot>
-            <tr style="background:#f9fbfd; border-top:2px solid #eee;">
-              <td colspan="3" style="padding:10px 16px; font-weight:600; color:var(--navy);">Total Captado</td>
-              <td style="padding:10px 16px; text-align:right; font-weight:700; color:#C5A059; font-size:13px;">${M(entradas)}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <div style="text-align:right;">
+          <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:2px;">Remanente Final</div>
+          <div style="font-size:28px; font-weight:700; color:${remanente >= 0 ? '#2ecc71' : '#E8A090'}; line-height:1;">${remanente >= 0 ? '+' : ''}${M(remanente)}</div>
+        </div>
       </div>
 
-      <!-- Flujo de capital -->
-      <div class="card" style="padding:24px;">
-        <div style="font-size:13px; font-weight:600; color:var(--navy); margin-bottom:16px;">Destino del Capital Captado</div>
-        ${[
-        { label: 'Entradas Brutas', val: entradas, color: '#2ecc71', icon: '+' },
-        ...(terrenoValor > 0 ? [{ label: v.aportaTerreno ? 'Terreno (Aportación)' : 'Compra de Terreno', val: -terrenoValor, color: '#E8A090', icon: '–' }] : []),
-        { label: `Nómina y Operativos (${meses} meses)`, val: -egresosFijos, color: '#E8A090', icon: '–' },
-        { label: 'Comisiones de Venta', val: -comision, color: '#E8A090', icon: '–' },
-        { label: 'Acoplamiento Preoperativo', val: -acop, color: '#E8A090', icon: '–' },
-        { label: 'Capital Neto para Obra', val: capitalNeto, color: capitalNeto > 0 ? 'var(--navy)' : '#E8A090', icon: '=' }
-      ].map((row, i, arr) => `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; ${i < arr.length - 1 ? 'border-bottom:1px solid #f0f0f0;' : 'border-top:2px solid #eee; margin-top:4px; padding-top:12px;'}">
-            <span style="font-size:12px; color:var(--text-muted);">
-              <span style="font-size:14px; font-weight:700; color:${row.color}; margin-right:8px;">${row.icon}</span>${row.label}
-            </span>
-            <span style="font-size:13px; font-weight:${i === arr.length - 1 ? '700' : '600'}; color:${row.color};">${M(Math.abs(row.val))}</span>
-          </div>`).join('')}
-      </div>
-    </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0;">
+
+        <!-- Columna izquierda: fases de levantamiento -->
+        <div style="border-right:1px solid #eee;">
+          <div style="padding:12px 20px; background:#f9fbfd; border-bottom:1px solid #eee;">
+            <span style="font-size:11px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:1px;">Fases de Levantamiento</span>
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:12px;">
+            <thead>
+              <tr style="border-bottom:1px solid #eee; color:var(--text-muted);">
+                <th style="padding:7px 16px; text-align:left; font-weight:500;">Fase</th>
+                <th style="padding:7px 8px; text-align:center; font-weight:500;">Tickets</th>
+                <th style="padding:7px 16px; text-align:right; font-weight:500;">Precio</th>
+                <th style="padding:7px 16px; text-align:right; font-weight:500;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${state.tickets.map(t => {
+                const sub = (Number(t.cantidad) || 0) * (Number(t.precio) || 0);
+                return `<tr style="border-bottom:1px solid #f5f5f5;">
+                  <td style="padding:8px 16px; color:var(--navy); font-weight:500;">${t.nombre}</td>
+                  <td style="padding:8px 8px; text-align:center; color:var(--text-muted);">${t.cantidad}</td>
+                  <td style="padding:8px 16px; text-align:right; color:var(--text-muted);">${M(t.precio)}</td>
+                  <td style="padding:8px 16px; text-align:right; font-weight:600; color:var(--navy);">${M(sub)}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background:#f9fbfd; border-top:2px solid #eee;">
+                <td colspan="3" style="padding:11px 16px; font-weight:700; color:var(--navy);">Total Captado</td>
+                <td style="padding:11px 16px; text-align:right; font-weight:700; color:#2ecc71; font-size:14px;">${M(entradas)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Columna derecha: destino del capital -->
+        <div>
+          <div style="padding:12px 20px; background:#f9fbfd; border-bottom:1px solid #eee;">
+            <span style="font-size:11px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:1px;">Destino del Capital</span>
+          </div>
+          <div style="padding:8px 24px;">
+            ${[
+              { label: 'Entradas Brutas', val: entradas, color: '#2ecc71', icon: '+', bold: false },
+              ...(terrenoValor > 0 ? [{ label: v.aportaTerreno ? 'Terreno (Aportación)' : 'Compra de Terreno', val: -terrenoValor, color: '#E8A090', icon: '–', bold: false }] : []),
+              { label: `Nómina y Operativos (${meses} meses)`, val: -egresosFijos, color: '#E8A090', icon: '–', bold: false },
+              { label: 'Comisiones de Venta', val: -comision, color: '#E8A090', icon: '–', bold: false },
+              { label: 'Acoplamiento Preoperativo', val: -acop, color: '#E8A090', icon: '–', bold: false },
+              { label: 'Capital Neto para Obra', val: capitalNeto, color: 'var(--navy)', icon: '=', bold: true, sep: true },
+              { label: 'Costo de Obra Civil', val: -costoObra, color: '#E8A090', icon: '–', bold: false },
+              { label: 'Remanente Final del Proyecto', val: remanente, color: remanente >= 0 ? '#2ecc71' : '#E8A090', icon: '=', bold: true, final: true }
+            ].map((row, i, arr) => `
+              <div style="display:flex; justify-content:space-between; align-items:center;
+                padding:${row.final ? '14px 0 10px' : '9px 0'};
+                ${row.final ? 'border-top:3px solid var(--navy); margin-top:6px;' : row.sep ? 'border-top:2px solid #eee; border-bottom:2px solid #eee; margin:4px 0; padding:10px 0;' : 'border-bottom:1px solid #f5f5f5;'}">
+                <span style="font-size:${row.final ? '13px' : '12px'}; color:${row.final ? 'var(--navy)' : 'var(--text-muted)'}; font-weight:${row.bold ? '700' : '400'};">
+                  <span style="font-size:${row.final ? '16px' : '14px'}; font-weight:700; color:${row.color}; margin-right:8px; font-family:monospace;">${row.icon}</span>${row.label}
+                </span>
+                <span style="font-size:${row.final ? '18px' : '13px'}; font-weight:${row.bold ? '700' : '600'}; color:${row.color};">${M(Math.abs(row.val))}</span>
+              </div>`).join('')}
+          </div>
+        </div>
 
       </div>
     </div>
