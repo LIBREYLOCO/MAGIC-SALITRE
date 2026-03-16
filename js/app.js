@@ -17,9 +17,9 @@ const App = (() => {
       m2ComercialPB: 3000,
       rentaM2Comercial: 450,
       m2HotelNivel1: 3000,
-      rentaM2HotelNivel1: 350,
+      rentaM2HotelNivel1: 300,
       m2HotelNivel2: 3000,
-      rentaM2HotelNivel2: 300,
+      rentaM2HotelNivel2: 250,
 
       m2Estacionamiento: 6000,
       capacidadEstacionamiento: 270,
@@ -381,7 +381,10 @@ const App = (() => {
     const entradasVendidas = state.tickets.filter(t => !t.esAportado).reduce((s, t) => s + (Number(t.cantidad) || 0) * (Number(t.precio) || 0), 0);
     const comision = entradasVendidas * ((e.comisionVentasPct || 0) / 100);
     const acop = (e.acopOficina || 0) + (e.acopMaqueta || 0) + (e.acopRenders || 0) + (e.acopFotos || 0) + (e.acopMedia || 0);
-    const egresosTotales = egresosFijos + acop + comision;
+    const terrenoValor = v.aportaTerreno
+      ? state.tickets.filter(t => t.esAportado).reduce((s, t) => s + (Number(t.cantidad) || 0) * (Number(t.precio) || 0), 0)
+      : (Number(v.costoCompraTerreno) || 0);
+    const egresosTotales = egresosFijos + acop + comision + terrenoValor;
     const capitalNeto = entradas - egresosTotales;
 
     // KPIs derivados
