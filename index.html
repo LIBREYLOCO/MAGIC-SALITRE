@@ -866,6 +866,14 @@
         }
       };
 
+      // Permitir acceso directo sin contraseña (solo presionando enter o clickeando el botón)
+      if (pwd === '') {
+        localStorage.setItem('lyl_mock_auth', JSON.stringify({ name: email || 'invitado@4l.com', role: 'admin' }));
+        finishLogin();
+        setTimeout(() => { location.reload(); }, 500);
+        return;
+      }
+
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
