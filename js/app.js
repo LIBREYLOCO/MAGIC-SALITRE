@@ -13,7 +13,7 @@ const App = (() => {
       proyecto: 'PUEBLO MÁGICO EL SALITRE',
       capitalRequerido: 215000000,
       terreno: 40000,
-      numTicketsMax: 370,
+      numTicketsMax: 407,
       m2ComercialPB: 3000,
       rentaM2Comercial: 450,
       m2HotelNivel1: 3000,
@@ -34,9 +34,9 @@ const App = (() => {
       pctTicketsModelo: 20,
       costoM2Construccion: 18000,
       precioMercadoActualM2: 48500,
-      aportaTerreno: false,
+      aportaTerreno: true,
       valorTerrenoAportado: 40000000,
-      precioTicketTerreno: 549000,
+      precioTicketTerreno: 599000,
       selectedPlusvaliaTicketIdx: 0,
       activeReportTab: 'ingresos',
       ocupacionRentas: [60, 75, 90, ...Array(17).fill(100)],
@@ -44,11 +44,11 @@ const App = (() => {
     },
     tickets: [
       { id: 1, cantidad: 50, precio: 599999, nombre: "Fase Semilla", esAportado: false },
-      { id: 2, cantidad: 50, precio: 649999, nombre: "Preventa Privada", esAportado: false },
-      { id: 3, cantidad: 75, precio: 699999, nombre: "Oferta Primaria", esAportado: false },
-      { id: 4, cantidad: 75, precio: 749999, nombre: "Oferta Secundaria", esAportado: false },
-      { id: 5, cantidad: 48, precio: 799999, nombre: "Cierre de Emisión", esAportado: false },
-      { id: 6, cantidad: 72, precio: 549000, nombre: "Capital Tierra", esAportado: true, esTerrenoFijo: true }
+      { id: 2, cantidad: 75, precio: 699999, nombre: "Preventa Privada", esAportado: false },
+      { id: 3, cantidad: 75, precio: 799999, nombre: "Oferta Primaria", esAportado: false },
+      { id: 4, cantidad: 30, precio: 899999, nombre: "Oferta Secundaria", esAportado: false },
+      { id: 5, cantidad: 30, precio: 999999, nombre: "Cierre de Emisión", esAportado: false },
+      { id: 6, cantidad: 66, precio: 599000, nombre: "Capital Tierra", esAportado: true, esTerrenoFijo: true }
     ],
     egresos: {
       nominaAdmin: 80000,
@@ -336,7 +336,8 @@ const App = (() => {
     const e = state.egresos;
     const meta = Number(v.capitalRequerido) || 0;
     const pctModelo = v.pctTicketsModelo || 0;
-    const maxTickets = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0) || 1;
+    const _stratSumDB = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const maxTickets = pctModelo < 100 ? Math.floor(_stratSumDB / (1 - pctModelo / 100)) : (_stratSumDB || 1);
     const ticketsModelo = Math.floor(maxTickets * (pctModelo / 100));
 
     // Entradas
@@ -946,9 +947,11 @@ const App = (() => {
     const ingresoMensual = ingresoRentasMensual + totalDiasBasico;
     const ingresoAnualTotal = ingresoMensual * 12;
 
-    const m2PorTicket = totalTicketsConfigured > 0 ? (totalSuperficie / totalTicketsConfigured) : 0;
+    const _pctMT = (Number(state.variables.pctTicketsModelo) || 0) / 100;
+    const _totalConModelo = _pctMT < 1 ? Math.floor(totalTicketsConfigured / (1 - _pctMT)) : (totalTicketsConfigured || 1);
+    const m2PorTicket = _totalConModelo > 0 ? (totalSuperficie / _totalConModelo) : 0;
     // Rent per ticket per year
-    const rentaAnualPorTicket = totalTicketsConfigured > 0 ? (ingresoAnualTotal / totalTicketsConfigured) : 0;
+    const rentaAnualPorTicket = _totalConModelo > 0 ? (ingresoAnualTotal / _totalConModelo) : 0;
 
     const phaseDescriptions = {
       "Fase Semilla": "Fase Semilla (Founders & partners): Suena a capital de riesgo exclusivo para el círculo interno.",
@@ -1362,7 +1365,9 @@ const App = (() => {
     const anios = Number(v.aniosProyeccion) || 10;
     const inflacion = (Number(v.inflacionAnualRentas) || 0) / 100;
     const adminPct = (Number(v.costoAdminRentasPct) || 0) / 100;
-    const maxTickets = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0) || 1;
+    const _stratSumIF = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const _pctMIF = (Number(v.pctTicketsModelo) || 0) / 100;
+    const maxTickets = _pctMIF < 1 ? Math.floor(_stratSumIF / (1 - _pctMIF)) : (_stratSumIF || 1);
 
     // --- PRE-CALCULAR DATA ANUAL UNIFICADA ---
     const yearlyData = [];
@@ -1646,7 +1651,9 @@ const App = (() => {
       const selTicket = state.tickets[selIdx] || state.tickets[0];
       const precioBaseVentaPromedio = selTicket ? Number(selTicket.precio) : 450000;
       const m2RentablesTotal = (Number(v.m2ComercialPB) || 0) + (Number(v.m2HotelNivel1) || 0) + (Number(v.m2HotelNivel2) || 0);
-      const _totalTkts = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+      const _stratSumPV1 = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+      const _pctMPV1 = (Number(v.pctTicketsModelo) || 0) / 100;
+      const _totalTkts = _pctMPV1 < 1 ? Math.floor(_stratSumPV1 / (1 - _pctMPV1)) : (_stratSumPV1 || 1);
       const eqFisica = (_totalTkts > 0 && m2RentablesTotal > 0) ? (m2RentablesTotal / _totalTkts) : 0;
       const precioActualMercado = Number(v.precioMercadoActualM2) || 48500;
       const valorEstimadoFinal = eqFisica * precioActualMercado;
@@ -1806,7 +1813,9 @@ const App = (() => {
       const precioBaseVentaPromedio = _selTicketChart ? Number(_selTicketChart.precio) : 450000;
 
       const m2RentablesTotal = (Number(v.m2ComercialPB) || 0) + (Number(v.m2HotelNivel1) || 0) + (Number(v.m2HotelNivel2) || 0);
-      const _totalTkts = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+      const _stratSumPV2 = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+      const _pctMPV2 = (Number(v.pctTicketsModelo) || 0) / 100;
+      const _totalTkts = _pctMPV2 < 1 ? Math.floor(_stratSumPV2 / (1 - _pctMPV2)) : (_stratSumPV2 || 1);
       const eqFisica = (_totalTkts > 0 && m2RentablesTotal > 0) ? (m2RentablesTotal / _totalTkts) : 0;
       const precioActualMercado = Number(v.precioMercadoActualM2) || 48500;
       const valorEstimadoFinal = eqFisica * precioActualMercado;
@@ -2010,7 +2019,9 @@ const App = (() => {
     const v = state.variables;
 
     const m2RentablesTotal = (Number(v.m2ComercialPB) || 0) + (Number(v.m2HotelNivel1) || 0) + (Number(v.m2HotelNivel2) || 0);
-    const _totalTktsPv = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const _stratSumPV = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const _pctMPV = (Number(v.pctTicketsModelo) || 0) / 100;
+    const _totalTktsPv = _pctMPV < 1 ? Math.floor(_stratSumPV / (1 - _pctMPV)) : (_stratSumPV || 1);
     const eqFisica = (_totalTktsPv > 0 && m2RentablesTotal > 0) ? (m2RentablesTotal / _totalTktsPv) : 0;
 
     const _selIdxPv = Math.min(Number(v.selectedPlusvaliaTicketIdx) || 0, state.tickets.length - 1);
@@ -2152,7 +2163,9 @@ const App = (() => {
     const anios = Number(v.aniosProyeccion) || 10;
     const inflacion = (Number(v.inflacionAnualRentas) || 0) / 100;
     const adminPct = (Number(v.costoAdminRentasPct) || 0) / 100;
-    const maxTickets = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0) || 1;
+    const _stratSumEF = state.tickets.reduce((s, t) => s + (Number(t.cantidad) || 0), 0);
+    const _pctMEF = (Number(v.pctTicketsModelo) || 0) / 100;
+    const maxTickets = _pctMEF < 1 ? Math.floor(_stratSumEF / (1 - _pctMEF)) : (_stratSumEF || 1);
 
     const m2ComercialPB = Number(v.m2ComercialPB) || 0;
     const rentaM2Comercial = Number(v.rentaM2Comercial) || 0;
