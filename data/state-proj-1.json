@@ -3,7 +3,7 @@
     "proyecto": "Pueblo Mexicano Querétaro (Tipo Val'Quirico)",
     "capitalRequerido": 215000000,
     "terreno": 40000,
-    "numTicketsMax": 400,
+    "numTicketsMax": 407,
     "m2ComercialPB": 3000,
     "rentaM2Comercial": 450,
     "m2HotelNivel1": 3000,
@@ -12,19 +12,19 @@
     "rentaM2HotelNivel2": 300,
     "m2Estacionamiento": 6000,
     "capacidadEstacionamiento": 270,
-    "cochesDiarios": 350,
+    "cochesDiarios": 300,
     "precioPorCoche": 70,
     "valorFideicomiso": 2000000,
     "costoFideicomisoMensual": 50000,
     "aniosProyeccion": 10,
     "inflacionAnualRentas": 5,
-    "costoAdminRentasPct": 8.9,
-    "pctTicketsModelo": 10,
+    "costoAdminRentasPct": 12,
+    "pctTicketsModelo": 20,
     "costoM2Construccion": 21000,
     "precioMercadoActualM2": 48500,
-    "aportaTerreno": false,
-    "valorTerrenoAportado": 36000000,
-    "precioTicketTerreno": 599999,
+    "aportaTerreno": true,
+    "valorTerrenoAportado": 40000000,
+    "precioTicketTerreno": 599000,
     "selectedPlusvaliaTicketIdx": 0,
     "activeReportTab": "ingresos",
     "ocupacionRentas": [
@@ -70,21 +70,22 @@
       100,
       100,
       100
-    ]
+    ],
+    "activeParamTab": "generales"
   },
   "tickets": [
     {
       "id": 1,
       "cantidad": 50,
-      "precio": 499999,
+      "precio": 599999,
       "nombre": "Fase Semilla",
       "esAportado": false,
       "esTerrenoFijo": false
     },
     {
       "id": 2,
-      "cantidad": 50,
-      "precio": 549999,
+      "cantidad": 75,
+      "precio": 699999,
       "nombre": "Preventa Privada",
       "esAportado": false,
       "esTerrenoFijo": false
@@ -92,31 +93,31 @@
     {
       "id": 3,
       "cantidad": 75,
-      "precio": 599999,
+      "precio": 799999,
       "nombre": "Oferta Primaria",
       "esAportado": false,
       "esTerrenoFijo": false
     },
     {
       "id": 4,
-      "cantidad": 75,
-      "precio": 649999,
+      "cantidad": 30,
+      "precio": 899999,
       "nombre": "Oferta Secundaria",
       "esAportado": false,
       "esTerrenoFijo": false
     },
     {
       "id": 5,
-      "cantidad": 50,
-      "precio": 719999,
+      "cantidad": 30,
+      "precio": 999999,
       "nombre": "Cierre de Emisión",
       "esAportado": false,
       "esTerrenoFijo": false
     },
     {
       "id": 6,
-      "cantidad": 60,
-      "precio": 599999,
+      "cantidad": 66,
+      "precio": 599000,
       "nombre": "Capital Tierra",
       "esAportado": true,
       "esTerrenoFijo": true
