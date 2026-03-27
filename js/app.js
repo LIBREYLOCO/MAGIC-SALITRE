@@ -39,6 +39,7 @@ const App = (() => {
       precioTicketTerreno: 599000,
       selectedPlusvaliaTicketIdx: 0,
       activeReportTab: 'ingresos',
+      incluyeEstacionamiento: true,
       ocupacionRentas: [60, 75, 90, ...Array(17).fill(100)],
       ocupacionEstacionamiento: [60, 75, 90, ...Array(17).fill(100)]
     },
@@ -368,7 +369,7 @@ const App = (() => {
     const rentaMensual = (m2Comercial * (Number(v.rentaM2Comercial) || 0))
       + (m2Hotel1 * (Number(v.rentaM2HotelNivel1) || 0))
       + (m2Hotel2 * (Number(v.rentaM2HotelNivel2) || 0));
-    const estacMensual = (Number(v.cochesDiarios) || 350) * (Number(v.precioPorCoche) || 50) * 30;
+    const estacMensual = v.incluyeEstacionamiento !== false ? (Number(v.cochesDiarios) || 350) * (Number(v.precioPorCoche) || 50) * 30 : 0;
     const ingresoMensualTotal = rentaMensual + estacMensual;
     const ingresoAnualTotal = ingresoMensualTotal * 12;
 
@@ -841,8 +842,17 @@ const App = (() => {
       const coches = Number(v.cochesDiarios) || 350;
       const precio = Number(v.precioPorCoche) || 50;
       const capacidad = Number(v.capacidadEstacionamiento) || 270;
+      const incluyeEstac = v.incluyeEstacionamiento !== false;
       html += `
       <h3 style="font-size:14px; color:var(--navy); margin-bottom:16px; font-weight:500">Parámetros de Estacionamiento Operativo (Concesión)</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:${incluyeEstac ? '20px' : '0'};">
+        <span style="font-size:12px; color:var(--text-muted);">¿Este proyecto incluye ingresos por estacionamiento?</span>
+        <button onclick="App.toggleIncluyeEstacionamiento()"
+          style="padding:8px 20px; border-radius:20px; border:2px solid ${incluyeEstac ? '#C5A059' : '#cbd5e1'}; background:${incluyeEstac ? 'rgba(197,160,89,0.1)' : 'white'}; color:${incluyeEstac ? '#C5A059' : 'var(--text-muted)'}; font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap;">
+          ${incluyeEstac ? '✓ Incluye estacionamiento' : 'No incluye estacionamiento'}
+        </button>
+      </div>
+      ${incluyeEstac ? `
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px;">
         <div>
           <label style="font-size:11px; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px">Capacidad Total de Coches (Cajones)</label>
@@ -864,7 +874,10 @@ const App = (() => {
         <span style="font-size:12px; color:var(--navy); font-weight:600;">Ingreso Bruto Mensual Estimado:</span>
         <span style="font-size:16px; color:#2ecc71; font-weight:700;">${M(coches * precio * 30)}</span>
         <span style="font-size:11px; color:var(--text-muted);">(${coches} coches × ${M(precio)} × 30 días)</span>
-      </div>`;
+      </div>` : `
+      <div style="margin-top:16px; padding:14px 20px; background:#f9fbfd; border-radius:6px; border:1px dashed #cbd5e1; color:var(--text-muted); font-size:13px;">
+        El ingreso por estacionamiento está excluido del modelo. Todos los cálculos usan $0 para este concepto.
+      </div>`}`;
     } else if (activeTab === 'fiduciaria') {
       html += `
       <h3 style="font-size:14px; color:var(--navy); margin-bottom:16px; font-weight:500">Estructura Fiduciaria</h3>
@@ -1358,7 +1371,7 @@ const App = (() => {
 
     const cochesDiarios = Number(v.cochesDiarios) || 350;
     const precioCoche = Number(v.precioPorCoche) || 50;
-    const ingresoEstacionamientoMensual = cochesDiarios * precioCoche * 30;
+    const ingresoEstacionamientoMensual = v.incluyeEstacionamiento !== false ? cochesDiarios * precioCoche * 30 : 0;
 
     const anios = Number(v.aniosProyeccion) || 10;
     const inflacion = (Number(v.inflacionAnualRentas) || 0) / 100;
@@ -2166,7 +2179,7 @@ const App = (() => {
 
     const cochesDiarios = Number(v.cochesDiarios) || 350;
     const precioCoche = Number(v.precioPorCoche) || 50;
-    const ingresoEstacionamientoMensualBase = cochesDiarios * precioCoche * 30;
+    const ingresoEstacionamientoMensualBase = v.incluyeEstacionamiento !== false ? cochesDiarios * precioCoche * 30 : 0;
 
     let html = `<div class="section-header">
       <div>
@@ -2951,6 +2964,13 @@ const App = (() => {
     navigate(currentView);
   }
 
+  function toggleIncluyeEstacionamiento() {
+    if (!state.variables) state.variables = {};
+    state.variables.incluyeEstacionamiento = state.variables.incluyeEstacionamiento === false ? true : false;
+    saveState();
+    navigate(currentView);
+  }
+
   function selectPlusvaliaTicket(idx) {
     if (!state.variables) state.variables = {};
     state.variables.selectedPlusvaliaTicketIdx = parseInt(idx);
@@ -3631,7 +3651,7 @@ return {
   init, navigate, exportCSV, exportCurrentViewToPDF, exportFullReport, toggleSidebar,
   addTicketTier, removeTicketTier,
   addShowroomItem, removeShowroomItem, addObraItem, removeObraItem, toggleTicketAportado,
-  toggleAportaTerreno, selectPlusvaliaTicket,
+  toggleAportaTerreno, toggleIncluyeEstacionamiento, selectPlusvaliaTicket,
   saveEscenario, loadEscenario, deleteEscenario,
   resetToFactory, resetState: resetToFactory,
   switchReportTab, switchParamTab, switchProyeccionTab,
