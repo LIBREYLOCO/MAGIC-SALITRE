@@ -3239,11 +3239,24 @@ const App = (() => {
     doc.text('ESTE DOCUMENTO ES UNA SIMULACIÓN FINANCIERA Y NO REPRESENTA UNA OFERTA VINCULANTE.', PAGE_W / 2, footerY, { align: 'center' });
   }
 
+  // Helper: esperar a que librerías de PDF estén disponibles (con defer cargan después)
+  function _waitForPDFLibs(timeout) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = () => {
+        if (typeof html2canvas !== 'undefined' && window.jspdf) { resolve(); return; }
+        if (Date.now() - start > (timeout || 10000)) { reject(new Error('Librerías de PDF no disponibles')); return; }
+        setTimeout(check, 200);
+      };
+      check();
+    });
+  }
+
   async function exportCurrentViewToPDF() {
     const element = document.getElementById('content-body');
     if (!element) { alert('No hay contenido para exportar.'); return; }
-    if (typeof html2pdf === 'undefined') {
-      alert('Librería de PDF no disponible. Verifica tu conexión a internet.');
+    try { await _waitForPDFLibs(8000); } catch (_) {
+      alert('Librerías de PDF aún cargando. Intenta de nuevo en unos segundos.');
       return;
     }
 
@@ -3298,8 +3311,8 @@ const App = (() => {
 }
 
   async function exportFullReport() {
-  if (typeof html2canvas === 'undefined' || !window.jspdf) {
-    alert('Librería de PDF no disponible. Verifica tu conexión a internet.');
+  try { await _waitForPDFLibs(8000); } catch (_) {
+    alert('Librerías de PDF aún cargando. Intenta de nuevo en unos segundos.');
     return;
   }
 

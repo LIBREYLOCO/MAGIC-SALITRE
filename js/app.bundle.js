@@ -3056,14 +3056,33 @@
       doc.setTextColor(197, 160, 89);
       doc.text("ESTE DOCUMENTO ES UNA SIMULACI\xD3N FINANCIERA Y NO REPRESENTA UNA OFERTA VINCULANTE.", PAGE_W / 2, footerY, { align: "center" });
     }
+    function _waitForPDFLibs(timeout) {
+      return new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+          if (typeof html2canvas !== "undefined" && window.jspdf) {
+            resolve();
+            return;
+          }
+          if (Date.now() - start > (timeout || 1e4)) {
+            reject(new Error("Librer\xEDas de PDF no disponibles"));
+            return;
+          }
+          setTimeout(check, 200);
+        };
+        check();
+      });
+    }
     async function exportCurrentViewToPDF() {
       const element = document.getElementById("content-body");
       if (!element) {
         alert("No hay contenido para exportar.");
         return;
       }
-      if (typeof html2pdf === "undefined") {
-        alert("Librer\xEDa de PDF no disponible. Verifica tu conexi\xF3n a internet.");
+      try {
+        await _waitForPDFLibs(8e3);
+      } catch (_) {
+        alert("Librer\xEDas de PDF a\xFAn cargando. Intenta de nuevo en unos segundos.");
         return;
       }
       const btn = document.querySelector('[onclick="App.exportCurrentViewToPDF()"]');
@@ -3121,8 +3140,10 @@
       }
     }
     async function exportFullReport() {
-      if (typeof html2canvas === "undefined" || !window.jspdf) {
-        alert("Librer\xEDa de PDF no disponible. Verifica tu conexi\xF3n a internet.");
+      try {
+        await _waitForPDFLibs(8e3);
+      } catch (_) {
+        alert("Librer\xEDas de PDF a\xFAn cargando. Intenta de nuevo en unos segundos.");
         return;
       }
       const btn = document.getElementById("btn-full-report");
