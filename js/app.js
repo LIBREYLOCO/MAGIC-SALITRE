@@ -1,9 +1,17 @@
 /* =============================================================
    Proyectos 4L: libertad, locura, liderazgo y legado — Motor Inmobiliario
-   Plantilla Limpia
    ============================================================= */
 
 'use strict';
+
+import { escapeHTML } from './modules/sanitize.js';
+import { debounce } from './modules/utils.js';
+import { validateField, showInputError, clearInputError } from './modules/validation.js';
+import {
+  calcMonthlyRent, calcParkingIncome, calcCapRate,
+  calcTotalEgresos, calcCostoObra, calcYearlyProjection,
+  calcRecoveryYears, calcPlusvalia, calcTicketMetrics
+} from './modules/calculations.js';
 
 const App = (() => {
 
@@ -99,7 +107,8 @@ const App = (() => {
 
   let state = {};
   let escenariosDb = [];        // cache en memoria — espejo del servidor
-  let _saveStateTimer = null;      // debounce para no saturar el servidor
+  let _saveStateTimer = null;      // legacy — ahora usando debounce util
+  let renderGeneration = 0;        // generación de render para evitar chart leaks
   let currentRole = 'viewer';  // rol del usuario activo
   let currentProjectId = null;     // proyecto activo en sesión
   let projectsList = [];        // lista de proyectos disponibles
@@ -236,19 +245,82 @@ const App = (() => {
   const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const M = (val) => MXN.format(val || 0);
 
-  function saveState() {
-    if (currentRole === 'viewer') return; // solo lectura — no guardar
-    // Guarda inmediatamente en localStorage (sin bloquear UI)
-    localStorage.setItem('lyl_bienraiz_state', JSON.stringify(state));
-    // Envía al servidor con debounce de 600ms para no saturar en cada tecla
-    if (_saveStateTimer) clearTimeout(_saveStateTimer);
-    _saveStateTimer = setTimeout(() => {
-      fetch('/api/state', {
+  // Indicador visual de guardado
+  function _showSaveIndicator(status) {
+    let ind = document.getElementById('save-indicator');
+    if (!ind) {
+      ind = document.createElement('div');
+      ind.id = 'save-indicator';
+      ind.style.cssText = 'position:fixed;bottom:16px;right:16px;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;z-index:9998;transition:opacity 0.3s;pointer-events:none;';
+      document.body.appendChild(ind);
+    }
+    if (status === 'saving') {
+      ind.textContent = 'Guardando...';
+      ind.style.background = 'rgba(197,160,89,0.9)';
+      ind.style.color = '#fff';
+      ind.style.opacity = '1';
+    } else if (status === 'saved') {
+      ind.textContent = '✓ Guardado';
+      ind.style.background = 'rgba(46,204,113,0.9)';
+      ind.style.color = '#fff';
+      ind.style.opacity = '1';
+      setTimeout(() => { ind.style.opacity = '0'; }, 1500);
+    } else if (status === 'conflict') {
+      ind.textContent = '⚠ Conflicto — recargando';
+      ind.style.background = 'rgba(232,160,144,0.9)';
+      ind.style.color = '#fff';
+      ind.style.opacity = '1';
+      setTimeout(() => { ind.style.opacity = '0'; }, 3000);
+    } else if (status === 'error') {
+      ind.textContent = '✕ Error al guardar';
+      ind.style.background = 'rgba(232,160,144,0.9)';
+      ind.style.color = '#fff';
+      ind.style.opacity = '1';
+      setTimeout(() => { ind.style.opacity = '0'; }, 3000);
+    }
+  }
+
+  // Función debounced para envío al servidor (1000ms)
+  const _debouncedServerSave = debounce(async () => {
+    _showSaveIndicator('saving');
+    try {
+      const res = await fetch('/api/state', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(state)
-      }).catch(() => { }); // silencioso — localStorage ya tiene la copia
-    }, 600);
+      });
+      if (res.status === 409) {
+        // Conflicto de versión — otro usuario modificó el estado
+        _showSaveIndicator('conflict');
+        const data = await res.json();
+        if (data.serverState) {
+          state = data.serverState;
+          localStorage.setItem('lyl_bienraiz_state', JSON.stringify(state));
+          navigate(currentView);
+        }
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data._version !== undefined) {
+          state._version = data._version;
+          localStorage.setItem('lyl_bienraiz_state', JSON.stringify(state));
+        }
+        _showSaveIndicator('saved');
+      } else {
+        _showSaveIndicator('error');
+      }
+    } catch (_) {
+      // Silencioso — localStorage ya tiene la copia
+    }
+  }, 1000);
+
+  function saveState() {
+    if (currentRole === 'viewer') return;
+    // Guarda inmediatamente en localStorage
+    localStorage.setItem('lyl_bienraiz_state', JSON.stringify(state));
+    // Envía al servidor con debounce de 1000ms
+    _debouncedServerSave();
   }
 
   async function loadState() {
@@ -399,14 +471,15 @@ const App = (() => {
         <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">${sub}</div>
       </div>`;
 
-    // Inyectar llamada a updateCharts justo después de que el DOM se actualice
-    setTimeout(updateCharts, 50);
+    // Inyectar llamada a updateCharts con guard de generación
+    const _gen = renderGeneration;
+    setTimeout(() => { if (renderGeneration === _gen) updateCharts(); }, 50);
 
     return `
     <div class="section-header">
       <div>
         <div class="section-title">Dashboard</div>
-        <div class="section-sub">${v.proyecto}</div>
+        <div class="section-sub">${escapeHTML(v.proyecto)}</div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:12px; font-weight:600; color:var(--navy);">${ticketsTotales} / ${maxTickets} tickets emitidos</div>
@@ -434,7 +507,7 @@ const App = (() => {
     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:20px;">
       ${kpiCard('Cap Rate Bruto Anual', `${capRate.toFixed(2)}%`, 'Ingreso anual ÷ capital captado', capRate > 8 ? 'status-high' : capRate > 5 ? 'status-mid' : 'status-low', '#C5A059', 'Tasa de capitalización: Eficiencia del activo para generar rentas. Ideal > 8%')}
       ${kpiCard('Equivalencia Física', `${(22.5).toFixed(1)} m²`, '9,000 m² rentables totales', 'var(--navy)', '#C5A059', 'Metros cuadrados proporcionales por ticket de inversión.')}
-      ${kpiCard('Ingreso Mensual Pool', M(v.ingresoMensualNeto || 0), 'Rentas + estacionamiento', v.ingresoMensualNeto > 4000000 ? 'status-high' : 'var(--navy)', '#C5A059', 'Flujo de caja neto estimado repartible mensualmente.')}
+      ${kpiCard('Ingreso Mensual Pool', M(v.ingresoMensualNeto || 0), v.incluyeEstacionamiento !== false ? 'Rentas + estacionamiento' : 'Rentas', v.ingresoMensualNeto > 4000000 ? 'status-high' : 'var(--navy)', '#C5A059', 'Flujo de caja neto estimado repartible mensualmente.')}
     </div>
 
     <!-- Barra de progreso -->
@@ -474,7 +547,7 @@ const App = (() => {
         <div>
           <div style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom:4px;">Ingreso Mensual Pool</div>
           <div style="font-size:22px; font-weight:700; color:var(--navy);">${M(ingresoMensualTotal)}</div>
-          <div style="font-size:11px; color:var(--text-muted);">Rentas + estacionamiento</div>
+          <div style="font-size:11px; color:var(--text-muted);">${v.incluyeEstacionamiento !== false ? 'Rentas + estacionamiento' : 'Rentas'}</div>
         </div>
       </div>
     </div>
@@ -512,7 +585,7 @@ const App = (() => {
               ${state.tickets.map(t => {
                 const sub = (Number(t.cantidad) || 0) * (Number(t.precio) || 0);
                 return `<tr style="border-bottom:1px solid #f5f5f5;">
-                  <td style="padding:8px 16px; color:var(--navy); font-weight:500;">${t.nombre}</td>
+                  <td style="padding:8px 16px; color:var(--navy); font-weight:500;">${escapeHTML(t.nombre)}</td>
                   <td style="padding:8px 8px; text-align:center; color:var(--text-muted);">${t.cantidad}</td>
                   <td style="padding:8px 16px; text-align:right; color:var(--text-muted);">${M(t.precio)}</td>
                   <td style="padding:8px 16px; text-align:right; font-weight:600; color:var(--navy);">${M(sub)}</td>
@@ -632,7 +705,7 @@ const App = (() => {
             const plusPct = Number(t.precio) > 0 ? ((valorFraccion / Number(t.precio)) - 1) * 100 : 0;
             const pos = plusMon > 0;
             return `<div style="background:#f9fbfd; border-radius:8px; padding:14px; text-align:center; border-bottom:3px solid ${pos ? '#2ecc71' : '#E8A090'}; ${t.esAportado ? 'opacity:0.75;' : ''}">
-              <div style="font-size:10px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; line-height:1.3;">${t.nombre}</div>
+              <div style="font-size:10px; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; line-height:1.3;">${escapeHTML(t.nombre)}</div>
               <div style="font-size:12px; font-weight:600; color:var(--navy); margin-bottom:8px;">${M(t.precio)}</div>
               <div style="font-size:22px; font-weight:700; color:${pos ? '#2ecc71' : '#E8A090'}; line-height:1;">${pos ? '+' : ''}${plusPct.toFixed(1)}%</div>
               <div style="font-size:11px; color:${pos ? '#2ecc71' : '#E8A090'}; margin-top:4px;">${pos ? '+' : ''}${M(plusMon)}</div>
@@ -1441,8 +1514,8 @@ const App = (() => {
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600; text-align:left;">Año Operativo</th>
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ocup.<br>Renta</th>
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ingreso<br>Rentas</th>
-            <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ocup.<br>Estac.</th>
-            <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ingreso<br>Estacionamiento</th>
+            ${v.incluyeEstacionamiento !== false ? `<th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ocup.<br>Estac.</th>
+            <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ingreso<br>Estacionamiento</th>` : ''}
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Costo Admin.<br>(${(adminPct * 100).toFixed(1)}%)</th>
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Utilidad Neta<br>(Pool Total)</th>
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Utilidad Neta<br>/ Ticket</th>
@@ -1467,8 +1540,8 @@ const App = (() => {
           <td style="padding:12px 16px; text-align:left; font-weight:600; color:var(--navy);">Año ${yr + 1}</td>
           <td style="padding:12px 16px; font-weight:600; color:#C5A059; background:rgba(197,160,89,0.05);">${(d.pctRent * 100).toFixed(0)}%</td>
           <td style="padding:12px 16px; color:var(--text-muted);">${M(d.ingresoNetoRentas)}</td>
-          <td style="padding:12px 16px; font-weight:600; color:#2ecc71; background:rgba(46,204,113,0.05);">${(d.pctEstac * 100).toFixed(0)}%</td>
-          <td style="padding:12px 16px; color:var(--text-muted);">${M(d.ingresoNetoEstac)}</td>
+          ${v.incluyeEstacionamiento !== false ? `<td style="padding:12px 16px; font-weight:600; color:#2ecc71; background:rgba(46,204,113,0.05);">${(d.pctEstac * 100).toFixed(0)}%</td>
+          <td style="padding:12px 16px; color:var(--text-muted);">${M(d.ingresoNetoEstac)}</td>` : ''}
           <td style="padding:12px 16px; color:#E8A090;">– ${M(d.costoAdmin)}</td>
           <td style="padding:12px 16px; font-weight:700; color:#2ecc71;">${M(d.utilidadPool)}</td>
           <td style="padding:12px 16px; font-weight:700; color:var(--navy); background:rgba(197,160,89,0.05);">${M(utilidadPorTicket)}</td>
@@ -2112,7 +2185,7 @@ const App = (() => {
         listHtml += `
           <div style="display:flex; justify-content:space-between; align-items:center; padding:16px; border-bottom:1px solid #eee; background:${isCurrent ? '#fbfcfe' : '#fff'}; border-left:${isCurrent ? '4px solid #C5A059' : '4px solid transparent'};">
             <div>
-              <div style="font-size:15px; font-weight:600; color:var(--navy); margin-bottom:4px;">${esc.nombre} ${isCurrent ? '<span style="font-size:10px; background:#C5A059; color:white; padding:2px 6px; border-radius:4px; margin-left:8px;">En Uso</span>' : ''}</div>
+              <div style="font-size:15px; font-weight:600; color:var(--navy); margin-bottom:4px;">${escapeHTML(esc.nombre)} ${isCurrent ? '<span style="font-size:10px; background:#C5A059; color:white; padding:2px 6px; border-radius:4px; margin-left:8px;">En Uso</span>' : ''}</div>
               <div style="font-size:11px; color:var(--text-muted);">Guardado el: ${new Date(esc.timestamp).toLocaleString()}</div>
             </div>
             <div style="display:flex; gap:8px;">
@@ -2217,25 +2290,30 @@ const App = (() => {
         </td>`;
     }
 
-    html += `</tr>
-          <tr>
+    html += `</tr>`;
+
+    if (v.incluyeEstacionamiento !== false) {
+      html += `<tr>
             <td style="padding:12px 8px; text-align:left; font-weight:600; color:var(--navy);">Ocupación Estacionamiento</td>`;
 
-    for (let i = 0; i < anios; i++) {
-      const val = v.ocupacionEstacionamiento[i] || 100;
-      html += `<td style="padding:12px 4px;">
-          <div style="display:flex; flex-direction:column; align-items:center;">
-             <div style="position:relative; width:100%; max-width:56px;">
-              <input type="number" class="form-input" min="0" max="100" step="1" 
-                value="${val}" style="width:100%; text-align:center; padding:6px 12px 6px 6px; font-weight:600; color:#2ecc71;"
-                 onchange="App.updateOcupacion('ocupacionEstacionamiento', ${i}, this.value)">
-              <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:11px; color:#2ecc71; pointer-events:none;">%</span>
+      for (let i = 0; i < anios; i++) {
+        const val = v.ocupacionEstacionamiento[i] || 100;
+        html += `<td style="padding:12px 4px;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+               <div style="position:relative; width:100%; max-width:56px;">
+                <input type="number" class="form-input" min="0" max="100" step="1"
+                  value="${val}" style="width:100%; text-align:center; padding:6px 12px 6px 6px; font-weight:600; color:#2ecc71;"
+                   onchange="App.updateOcupacion('ocupacionEstacionamiento', ${i}, this.value)">
+                <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:11px; color:#2ecc71; pointer-events:none;">%</span>
+              </div>
             </div>
-          </div>
-        </td>`;
+          </td>`;
+      }
+
+      html += `</tr>`;
     }
 
-    html += `</tr>
+    html += `
         </tbody>
       </table>
     </div>`;
@@ -2254,9 +2332,9 @@ const App = (() => {
           <tr style="border-bottom:2px solid #eee; background:#f9fbfd; color:var(--navy);">
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600; text-align:left;">Año de Operación</th>
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ocup.<br>Renta</th>
-            <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ocup.<br>Estac.</th>
+            ${v.incluyeEstacionamiento !== false ? `<th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ocup.<br>Estac.</th>` : ''}
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ingreso Ajustado Rentas (Bruto)</th>
-            <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ingreso Ajustado<br>Estacionamiento</th>
+            ${v.incluyeEstacionamiento !== false ? `<th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Ingreso Ajustado<br>Estacionamiento</th>` : ''}
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Costo Admin. (${(adminPct * 100).toFixed(1)}%)</th>
             <th style="padding:${isPDFMode ? '8px 10px' : '12px 16px'}; font-weight:600;">Utilidad Neta Ponderada</th>
             ${headersHTML}
@@ -2297,9 +2375,9 @@ const App = (() => {
           <tr style="border-bottom:1px solid #f5f5f5;">
             <td style="padding:12px 16px; text-align:left; font-weight:500; color:var(--navy);">Año ${yr + 1}</td>
             <td style="padding:12px 16px; font-weight:600; color:#C5A059; background:rgba(197, 160, 89, 0.05);">${(pctRent * 100).toFixed(0)}%</td>
-            <td style="padding:12px 16px; font-weight:600; color:#2ecc71; background:rgba(46, 204, 113, 0.05);">${(pctEstac * 100).toFixed(0)}%</td>
+            ${v.incluyeEstacionamiento !== false ? `<td style="padding:12px 16px; font-weight:600; color:#2ecc71; background:rgba(46, 204, 113, 0.05);">${(pctEstac * 100).toFixed(0)}%</td>` : ''}
             <td style="padding:12px 16px; color:var(--text-muted);">${M(ingresoNetoRentas)}</td>
-            <td style="padding:12px 16px; color:var(--text-muted);">${M(ingresoNetoEstacionamiento)}</td>
+            ${v.incluyeEstacionamiento !== false ? `<td style="padding:12px 16px; color:var(--text-muted);">${M(ingresoNetoEstacionamiento)}</td>` : ''}
             <td style="padding:12px 16px; color:#E8A090;">- ${M(costoAdmin)}</td>
             <td style="padding:12px 16px; font-weight:600; color:#2ecc71;">${M(utilidadNetaPool)}</td>
             ${yieldColumns}
@@ -2326,7 +2404,7 @@ const App = (() => {
       return;
     }
     const options = projectsList.map(p =>
-      `<option value="${p.id}" ${p.id === currentProjectId ? 'selected' : ''}>${p.nombre}</option>`
+      `<option value="${p.id}" ${p.id === currentProjectId ? 'selected' : ''}>${escapeHTML(p.nombre)}</option>`
     ).join('');
     const adminBtn = currentRole === 'admin'
       ? `<button class="proj-sel-btn" onclick="App.navigate('proyectos')" title="Gestionar proyectos">
@@ -2387,10 +2465,10 @@ const App = (() => {
       const fecha = new Date(p.createdAt).toLocaleDateString('es-MX');
       return `<tr style="background:${isCurrent ? 'rgba(197,160,89,.07)' : '#fff'}; border-bottom:1px solid #eee;">
         <td style="padding:12px 16px; font-weight:${isCurrent ? '600' : '400'}; color:var(--navy);">
-          ${p.nombre}
+          ${escapeHTML(p.nombre)}
           ${isCurrent ? '<span style="font-size:10px;background:#C5A059;color:#fff;padding:2px 7px;border-radius:10px;margin-left:8px;">Activo</span>' : ''}
         </td>
-        <td style="padding:12px 16px; color:#666; font-size:13px;">${p.descripcion || '—'}</td>
+        <td style="padding:12px 16px; color:#666; font-size:13px;">${escapeHTML(p.descripcion) || '—'}</td>
         <td style="padding:12px 16px; color:#999; font-size:12px;">${fecha}</td>
         <td style="padding:12px 16px; display:flex; gap:6px; flex-wrap:wrap;">
           ${!isCurrent ? `<button onclick="App.switchProject('${p.id}')" class="btn-accion btn-accion-primario">Activar</button>` : ''}
@@ -2429,8 +2507,8 @@ const App = (() => {
 
     const rows = usersDb.map(u => {
       return `<tr style="border-bottom:1px solid #eee;">
-        <td style="padding:12px 16px; font-weight:500; color:var(--navy);">${u.name}</td>
-        <td style="padding:12px 16px; color:#555; font-size:13px;">${u.email}</td>
+        <td style="padding:12px 16px; font-weight:500; color:var(--navy);">${escapeHTML(u.name)}</td>
+        <td style="padding:12px 16px; color:#555; font-size:13px;">${escapeHTML(u.email)}</td>
         <td style="padding:12px 16px;">
           <span style="font-size:11px;background:${rolColor[u.role]};color:#fff;padding:2px 8px;border-radius:10px;">${rolLabel[u.role] || u.role}</span>
         </td>
@@ -2718,8 +2796,8 @@ const App = (() => {
       return `
                 <tr>
                   <td>
-                    <div style="font-weight:600; color:var(--navy);">${i.nombre}</div>
-                    <div style="font-size:10px; color:var(--text-muted);">${i.correo}</div>
+                    <div style="font-weight:600; color:var(--navy);">${escapeHTML(i.nombre)}</div>
+                    <div style="font-size:10px; color:var(--text-muted);">${escapeHTML(i.correo)}</div>
                   </td>
                   <td><span class="status-indicator">${i.faseNombre}</span></td>
                   <td class="text-right">${i.tickets}</td>
@@ -2759,9 +2837,9 @@ const App = (() => {
       return `
                 <tr>
                   <td>${p.fecha}</td>
-                  <td style="font-weight:600;">${inv.nombre}</td>
-                  <td>${inv.faseNombre}</td>
-                  <td><span class="status-indicator">${p.metodo}</span></td>
+                  <td style="font-weight:600;">${escapeHTML(inv.nombre)}</td>
+                  <td>${escapeHTML(inv.faseNombre)}</td>
+                  <td><span class="status-indicator">${escapeHTML(p.metodo)}</span></td>
                   <td class="text-right" style="font-weight:700; color:var(--status-high);">${M(p.monto)}</td>
                   <td class="text-center">
                     <button class="btn-table-action" onclick="App.deletePago(${p.id})" title="Eliminar pago">🗑</button>
@@ -2816,6 +2894,9 @@ const App = (() => {
   function navigate(view) {
     if (!RENDERERS[view]) view = 'dashboard';
     currentView = view;
+    renderGeneration++;
+    const gen = renderGeneration;
+
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
     const titleEl = document.getElementById('content-title');
     if (titleEl) titleEl.textContent = VIEW_TITLES[view] || view;
@@ -2827,13 +2908,13 @@ const App = (() => {
         body.innerHTML = RENDERERS[view]();
       } catch (renderErr) {
         console.error('Render error for view "' + view + '":', renderErr);
-        body.innerHTML = '<div style="padding:32px; color:#c00;">Error al renderizar vista. Recarga la página.<br><small>' + renderErr.message + '</small></div>';
+        body.innerHTML = '<div style="padding:32px; color:#c00;">Error al renderizar vista. Recarga la página.<br><small>' + escapeHTML(renderErr.message) + '</small></div>';
         return;
       }
       attachInputListeners();
 
       if (view === 'reportes') {
-        setTimeout(initReportesCharts, 50);
+        setTimeout(() => { if (renderGeneration === gen) initReportesCharts(); }, 50);
       }
     } else {
       console.error('content-body element not found in DOM');
@@ -2900,6 +2981,13 @@ const App = (() => {
     if (!key) return;
 
     if (el.dataset.isText) {
+      // Validación de texto
+      const validation = validateField(key, el.value, true);
+      if (!validation.valid) {
+        showInputError(el, validation.message);
+        return;
+      }
+      clearInputError(el);
       if (nested) {
         if (!state[nested]) state[nested] = {};
         state[nested][key] = el.value;
@@ -2908,7 +2996,27 @@ const App = (() => {
       }
     } else {
       const raw = parseFloat(String(el.value).replace(/[$,\\s]/g, ''));
-      if (isNaN(raw)) return;
+      if (isNaN(raw)) {
+        showInputError(el, 'Debe ser un número válido');
+        return;
+      }
+      // Validación numérica
+      const validation = validateField(key, raw, false);
+      if (!validation.valid) {
+        showInputError(el, validation.message);
+        if (validation.clamped !== undefined) {
+          // Auto-corregir al valor más cercano válido
+          const clamped = validation.clamped;
+          if (nested) {
+            if (!state[nested]) state[nested] = {};
+            state[nested][key] = clamped;
+          } else {
+            state[key] = clamped;
+          }
+        }
+        return;
+      }
+      clearInputError(el);
       if (nested) {
         if (!state[nested]) state[nested] = {};
         state[nested][key] = raw;
@@ -3234,7 +3342,7 @@ const App = (() => {
     { view: 'dashboard', title: 'Dashboard' },
     { view: 'parametros', title: 'Parámetros — Generales', set: { activeParamTab: 'generales' } },
     { view: 'parametros', title: 'Parámetros — Rentas y Tarifas', set: { activeParamTab: 'rentas' } },
-    { view: 'parametros', title: 'Parámetros — Estacionamiento', set: { activeParamTab: 'estacionamiento' } },
+    ...(state.variables.incluyeEstacionamiento !== false ? [{ view: 'parametros', title: 'Parámetros — Estacionamiento', set: { activeParamTab: 'estacionamiento' } }] : []),
     { view: 'parametros', title: 'Parámetros — Estructura Fiduciaria', set: { activeParamTab: 'fiduciaria' } },
     { view: 'tickets', title: 'Estrategia de Tickets' },
     { view: 'egresos', title: 'Presupuesto de Egresos' },

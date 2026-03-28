@@ -132,8 +132,22 @@ app.get('/api/state', (req, res) => {
 app.put('/api/state', requireWriter, (req, res) => {
   const pid = req.session.currentProjectId;
   if (!pid) return res.status(400).json({ error: 'Sin proyecto activo' });
+
+  // Optimistic locking: verificar versión
+  const current = getProjectData(pid, 'state');
+  const clientVersion = req.body._version || 0;
+  const serverVersion = (current && current._version) || 0;
+
+  if (clientVersion > 0 && clientVersion < serverVersion) {
+    return res.status(409).json({
+      error: 'Conflicto de versión',
+      serverState: current
+    });
+  }
+
+  req.body._version = serverVersion + 1;
   writeProjectData(pid, 'state', req.body);
-  res.json({ ok: true });
+  res.json({ ok: true, _version: req.body._version });
 });
 
 // ── API: Escenarios (por proyecto) ───────────────────────────────────────────
