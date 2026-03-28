@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <!-- Preload LCP image -->
+  <link rel="preload" as="image" href="img/logo-600.png" fetchpriority="high">
 </head>
 
 <body>
@@ -87,7 +89,7 @@
 
         <!-- LOGO — grande, protagonista -->
         <div class="lp-logo-wrap">
-          <img src="img/logo.png" alt="L&amp;L" class="lp-logo">
+          <img src="img/logo-600.png" alt="L&amp;L" class="lp-logo" width="320" height="320" fetchpriority="high">
         </div>
 
         <!-- Gold rule -->
@@ -1311,10 +1313,9 @@
     </button>
   </div>
 
-  <!-- Critical: Chart.js necesario para el dashboard inicial -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <!-- Main App Module — carga antes que las libs secundarias para inicializar rápido -->
-  <script src="js/app.bundle.js"></script>
+  <!-- Chart.js + App: defer para no bloquear el render del login portal (LCP) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script defer src="js/app.bundle.js"></script>
   <!-- Libs secundarias: defer para no bloquear el render inicial.
        Se usan solo al exportar PDF/CSV, no al cargar la página. -->
   <script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>

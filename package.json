@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "npm run build && node server.js",
-    "build": "esbuild js/app.js --bundle --outfile=js/app.bundle.js --format=iife --target=es2020",
+    "build": "esbuild js/app.js --bundle --outfile=js/app.bundle.js --format=iife --target=es2020 --minify",
     "build:watch": "esbuild js/app.js --bundle --outfile=js/app.bundle.js --format=iife --target=es2020 --watch",
     "test": "vitest run",
     "test:watch": "vitest"
