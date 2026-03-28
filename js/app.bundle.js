@@ -1,5 +1,5 @@
 "use strict";
-var App = (() => {
+(() => {
   // js/modules/sanitize.js
   function escapeHTML(str) {
     if (str == null) return "";
